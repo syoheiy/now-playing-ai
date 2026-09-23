@@ -110,6 +110,11 @@
     </div>
 
     <div class="flex items-center gap-2 shrink-0">
+      <button id="btn-toggle-compact" class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition whitespace-nowrap" title="ミニマム表示に切り替え">
+        <i id="icon-compact" data-lucide="minimize-2" class="h-3.5 w-3.5"></i>
+        <span id="text-compact">ミニマム</span>
+      </button>
+
       <button id="btn-copy-track-header" class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition whitespace-nowrap" title="曲情報を共有またはコピー">
         <i data-lucide="share-2" class="h-3.5 w-3.5"></i>
         <span id="btn-copy-track-text">曲情報</span>
@@ -137,20 +142,20 @@
   <main class="w-full flex-1 px-3 sm:px-8 py-5 flex flex-col gap-6">
 
     <!-- 楽曲メタ情報：四角いカードで囲わず、自然なドキュメントヘッダーとして展開 -->
-    <section class="w-full flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 pb-5 border-b border-slate-100 dark:border-slate-800/80">
+    <section id="track-meta-section" class="w-full flex flex-col md:flex-row items-center md:items-start gap-5 md:gap-8 pb-5 border-b border-slate-100 dark:border-slate-800/80 transition-all duration-300">
       
-      <!-- アートワーク：余計な背景枠やドロップシャドウを排除 -->
-      <div class="w-28 h-28 sm:w-36 sm:h-36 shrink-0 flex items-center justify-center overflow-hidden">
+      <!-- アートワーク：堂々とした見応えのあるサイズへ拡大（スマホでw-48〜56、PCでw-64〜72） -->
+      <div class="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 shrink-0 flex items-center justify-center overflow-hidden rounded-lg shadow-sm">
         <img id="artwork-img" src="" alt="Album Artwork" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden">
-        <div id="artwork-fallback" class="w-full h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 border border-slate-100 dark:border-slate-800">
-          <i data-lucide="disc-3" class="h-10 w-10 mb-1 opacity-50"></i>
-          <span class="text-[10px] font-mono">No Image</span>
+        <div id="artwork-fallback" class="w-full h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 rounded-lg">
+          <i data-lucide="disc-3" class="h-16 w-16 mb-2 opacity-40"></i>
+          <span class="text-xs font-mono">No Image</span>
         </div>
       </div>
 
       <!-- タイトル・アーティスト・ステータス -->
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+      <div class="flex-1 min-w-0 w-full flex flex-col justify-center text-center md:text-left">
+        <div class="flex items-center justify-center md:justify-start gap-2 mb-1.5 flex-wrap">
           <span id="source-app-name" class="text-xs font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             待機中
@@ -161,22 +166,22 @@
           <span id="analysis-status-text" class="text-[10px] font-mono text-slate-400">停止中</span>
         </div>
 
-        <h1 id="track-title" class="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-snug break-words">
+        <h1 id="track-title" class="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-white leading-snug break-words">
           再生・共有を待機中
         </h1>
-        <p id="track-artist" class="text-sm sm:text-base font-medium text-slate-600 dark:text-slate-300 mt-1 break-words">
+        <p id="track-artist" class="text-base sm:text-lg font-medium text-slate-600 dark:text-slate-300 mt-1.5 break-words">
           音楽アプリから曲を共有するか、PCで再生を開始してください
         </p>
-        <p id="track-album" class="text-xs text-slate-400 dark:text-slate-500 mt-0.5 break-words hidden"></p>
+        <p id="track-album" class="text-sm text-slate-400 dark:text-slate-500 mt-1 break-words hidden"></p>
 
         <!-- プレイヤーコントロール：スリムなインライン配置 -->
-        <div class="mt-3 flex items-center gap-4 flex-wrap">
+        <div class="mt-4 flex items-center justify-center md:justify-start gap-4 flex-wrap">
           <div class="flex items-center gap-2">
-            <button id="btn-prev-track" class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition"><i data-lucide="skip-back" class="h-4 w-4"></i></button>
-            <button id="btn-play-pause" class="w-8 h-8 rounded-full bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center transition">
-              <i id="icon-play-pause" data-lucide="play" class="h-3.5 w-3.5 fill-current ml-0.5"></i>
+            <button id="btn-prev-track" class="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition"><i data-lucide="skip-back" class="h-4 w-4"></i></button>
+            <button id="btn-play-pause" class="w-9 h-9 rounded-full bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center transition shadow-sm">
+              <i id="icon-play-pause" data-lucide="play" class="h-4 w-4 fill-current ml-0.5"></i>
             </button>
-            <button id="btn-next-track" class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition"><i data-lucide="skip-forward" class="h-4 w-4"></i></button>
+            <button id="btn-next-track" class="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition"><i data-lucide="skip-forward" class="h-4 w-4"></i></button>
           </div>
           <div class="flex items-center gap-2 w-32">
             <i data-lucide="volume-2" class="h-3 w-3 text-slate-400"></i>
@@ -264,10 +269,15 @@
       chatHistory: [],
       trackGenerationId: 0,
       isSessionActive: false,
+      isCompact: false,
       workingModel: null
     };
 
     // DOM 要素参照
+    const elTrackMetaSection = document.getElementById('track-meta-section');
+    const elBtnToggleCompact = document.getElementById('btn-toggle-compact');
+    const elIconCompact = document.getElementById('icon-compact');
+    const elTextCompact = document.getElementById('text-compact');
     const elArtworkImg = document.getElementById('artwork-img');
     const elArtworkFallback = document.getElementById('artwork-fallback');
     const elTrackTitle = document.getElementById('track-title');
@@ -336,6 +346,24 @@
       text = text.replace(/(#{1,6}\s+[^\n]+)\n([^\n#])/g, '$1\n\n$2');
       text = text.replace(/\n{3,}/g, '\n\n');
       return text;
+    }
+
+    function toggleCompactMode() {
+      state.isCompact = !state.isCompact;
+      if (state.isCompact) {
+        elTrackMetaSection.classList.add('hidden');
+        elTextCompact.textContent = '標準';
+        elIconCompact.setAttribute('data-lucide', 'maximize-2');
+      } else {
+        elTrackMetaSection.classList.remove('hidden');
+        elTextCompact.textContent = 'ミニマム';
+        elIconCompact.setAttribute('data-lucide', 'minimize-2');
+      }
+      safeCreateIcons();
+    }
+
+    if (elBtnToggleCompact) {
+      elBtnToggleCompact.addEventListener('click', toggleCompactMode);
     }
 
     function updateSessionUI() {
