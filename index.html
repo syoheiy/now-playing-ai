@@ -306,12 +306,11 @@
   </div>
 
   <script>
-    // 確実に動作するテキスト生成用モデルの優先リスト（特殊モデル・プレビュー専用は除外）
+    // Google推奨の最新安定モデル一覧（エラーの指示に従い2.5系を最優先）
     const PRIMARY_MODELS = [
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash-lite'
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-2.5-pro'
     ];
 
     const state = {
@@ -785,7 +784,6 @@
       }
     }
 
-    // 利用可能モデルのリストを作成（既知の動くモデルを先頭にし、特殊モデルを除外）
     function getCandidateModels() {
       if (state.workingModel) {
         return [state.workingModel, ...PRIMARY_MODELS.filter(m => m !== state.workingModel)];
@@ -793,7 +791,7 @@
       return [...PRIMARY_MODELS];
     }
 
-    // 安定稼働モデルへの自動フォールバック関数
+    // Google推奨モデルへのフォールバック関数
     async function callGeminiWithFallback(apiKey, bodyObj) {
       const candidateModels = getCandidateModels();
       let lastError = null;
@@ -810,7 +808,7 @@
             const data = await res.json();
             const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (resultText) {
-              state.workingModel = model; // 成功したモデルをキャッシュして次回から最速実行
+              state.workingModel = model; // 成功したモデルをキャッシュ
               return resultText;
             }
           }
@@ -819,12 +817,12 @@
           const errMsg = errJson.error?.message || `HTTP ${res.status}`;
           lastError = new Error(`[${model}] ${errMsg}`);
 
-          // APIキー自体が無効な場合（認証不合格）のみ即時終了
+          // APIキー自体が無効な場合のみ即終了
           if (res.status === 401 || errMsg.includes('API_KEY_INVALID') || errMsg.includes('key not valid')) {
             throw lastError;
           }
 
-          // それ以外の全エラー（特殊モデル非対応、モデル不在、パラメータ相違など）は次のモデルへ切り替えて試行
+          // モデル廃止・非対応等のエラーは次の候補へスキップ
           console.warn(`Model ${model} failed (${errMsg}). Trying next model...`);
           continue;
 
@@ -837,7 +835,7 @@
         }
       }
 
-      throw lastError || new Error('利用可能なGeminiモデルが見つかりませんでした。APIキーをご確認ください。');
+      throw lastError || new Error('利用可能なGeminiモデルが見つかりませんでした。');
     }
 
     async function triggerGeminiAnalysis(targetGenId) {
@@ -1051,8 +1049,15 @@
     checkIncomingShare();
   </script>
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js');
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:') && !location.href.startsWith('blob:')) {
+      try {
+        const swPath = new URL('./sw.js', window.location.href).href;
+        navigator.serviceWorker.register(swPath).catch(err => {
+          console.warn('Service Worker registration skipped:', err);
+        });
+      } catch (e) {
+        console.warn('Service Worker setup skipped:', e);
+      }
     }
   </script>
 </body>
