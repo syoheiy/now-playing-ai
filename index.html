@@ -31,7 +31,7 @@
       font-size: 1.15rem;
       color: #0f172a;
       margin-top: 2.2rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.15rem;
       letter-spacing: -0.01em;
       line-height: 1.4;
     }
@@ -43,26 +43,27 @@
       border-left-color: #38bdf8;
     }
 
-    /* サブセクション（1. 2. 3. などの小見出し）の太字・空行設定 */
+    /* サブセクション（1. 2. 3. などの小見出し）：前には空行、本文との間には空行を挟まない */
     .prose-music h4, .prose-music .sub-heading {
       font-weight: 700;
       font-size: 1.05rem;
       color: #0f172a;
-      margin-top: 1.8rem;
-      margin-bottom: 0.6rem;
-      line-height: 1.5;
+      margin-top: 1.6rem;
+      margin-bottom: 0.15rem;
+      line-height: 1.4;
       display: block;
     }
     .dark .prose-music h4, .dark .prose-music .sub-heading {
       color: #f1f5f9;
     }
 
+    /* 本文：見出し直下から空行なしで開始し、頭に全角1文字分の空白（インデント）を配置 */
     .prose-music p {
       color: #1e293b;
       font-size: 1.05rem;
-      line-height: 1.9;
+      line-height: 1.85;
       margin-top: 0;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1rem;
       text-indent: 1em;
       letter-spacing: 0.01em;
       word-break: break-word;
@@ -73,10 +74,10 @@
 
     .prose-music strong, .prose-music b {
       font-weight: 700;
-      color: #0284c7;
+      color: inherit;
     }
     .dark .prose-music strong, .dark .prose-music b {
-      color: #38bdf8;
+      color: inherit;
     }
 
     /* 番号付きリストやサブセクション項目の余白確保 */
@@ -318,8 +319,8 @@
       if (!rawMarkdown) return '';
       let text = rawMarkdown;
 
-      // 「1. 見出し」「2. 見出し」等のサブセクション行を自動検出し、太字小見出し(h4)化＆前後に十分な空行を確保
-      text = text.replace(/(?:^|\n)(\d+\.\s+[^\n:：]+)(?=\n|$)/g, '\n\n#### $1\n\n');
+      // 「1. 見出し」「2. 見出し」等のサブセクション行を自動検出し、太字小見出し(h4)化（見出し直後の空行は排除）
+      text = text.replace(/(?:^|\n)(\d+\.\s+[^\n:：]+)(?:\n+)/g, '\n\n#### $1\n');
 
       // 太字タグの正規化
       text = text.replace(/\*\*\s*([^\*\n]+?)\s*\*\*/g, '<strong>$1</strong>');
@@ -722,15 +723,19 @@
 絶対厳守の執筆ルール:
 1. 【前置き・挨拶の完全禁止】
    前置き文は1文字も書かず、1行目からいきなり「### アーティストと楽曲の背景」で開始してください。
-2. 【見出しと構成（空行の徹底）】
+2. 【見出しと構成】
    必ず以下の3つの見出しを使用し、各パートをしっかり詳しく記述してください。
-   各見出し（###）の直前と直後には必ず空行を1行空けてください：
+   ・見出しの前には空行を1行入れてください。
+   ・見出しの直後の行から空行を挟まずに本文を開始し、行頭には必ず全角空白（　）を1文字入れてください。
 
    ### アーティストと楽曲の背景
+   　本文...
 
    ### 演奏・アンサンブルの特徴
+   　本文...
 
    ### 聴きどころと位置づけ
+   　本文...
 
 3. 【事実の正確性とクレジットの徹底】
    - 作詞・作曲・編曲者、リリース年、参加ミュージシャンなどの固有名詞を正確に記述してください。
@@ -794,8 +799,9 @@
 
 回答ルール:
 1. 前置きや挨拶は一切省き、要点を分かりやすく回答してください。
-2. 「1. 結成とバンド名の由来」などの番号付きサブセクションを用いる場合は、各サブセクションの見出しを太字（#### または **1. 見出し**）にし、各サブセクションの前には必ず空行を1行設けて視認性を高めてください。
-3. 重要な固有名詞やキーワードは **太字** で強調してください。`;
+2. 「1. 結成とバンド名の由来」などの番号付きサブセクションを用いる場合は、前の項目との間に空行を1行設けてください。
+3. 各見出しの直後の行から空行を入れずに本文を開始し、行頭には必ず全角空白（　）を1文字入れて記述してください。
+4. 重要な固有名詞やキーワードは **太字** で強調してください。`;
 
       try {
         const bodyObj = {
