@@ -90,7 +90,7 @@
     </div>
   </header>
 
-  <!-- 受信ステータス/デバッグ用トースト（共有時に何が届いたかを表示） -->
+  <!-- 受信ステータス/デバッグ用トースト -->
   <div id="share-debug-banner" class="hidden bg-sky-50 dark:bg-sky-950/60 border-b border-sky-100 dark:border-sky-900 px-4 py-2 text-[11px] text-sky-700 dark:text-sky-300 flex items-center justify-between">
     <span id="share-debug-text" class="truncate">共有データを受信しました</span>
     <button onclick="this.parentElement.classList.add('hidden')" class="ml-2 text-sky-500 hover:text-sky-700">✕</button>
@@ -306,6 +306,15 @@
   </div>
 
   <script>
+    // 利用可能なモデルの静的フォールバック候補
+    const FALLBACK_MODELS = [
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-8b',
+      'gemini-2.5-flash'
+    ];
+
     const state = {
       apiKey: localStorage.getItem('gemini_api_key') || '',
       isCompact: localStorage.getItem('view_mode_compact') === 'true',
@@ -326,13 +335,8 @@
       chatHistory: [],
       trackGenerationId: 0,
       isSessionActive: false,
-      activeAlbumKey: '',
-      consecutiveCount: 0,
-      isAlbumMode: false
+      cachedModelList: null
     };
-
-    let isUserDraggingSlider = false;
-    let lockDetectionTimer = null;
 
     const elStandardView = document.getElementById('standard-view');
     const elCompactView = document.getElementById('compact-view');
@@ -424,10 +428,6 @@
       return text;
     }
 
-    function normalizeKey(str) {
-      return (str || '').trim().toLowerCase().replace(/[\s\u3000\-_—]/g, '');
-    }
-
     function updateSessionUI() {
       if (state.isSessionActive) {
         elBtnStartSession.classList.add('hidden');
@@ -446,16 +446,6 @@
         elAnalysisStatusText.textContent = '停止中';
       }
       safeCreateIcons();
-    }
-
-    function updateModeBadges() {
-      if (state.isAlbumMode) {
-        elCompactModeBadge.classList.remove('hidden');
-        elStandardModeBadge.classList.remove('hidden');
-      } else {
-        elCompactModeBadge.classList.add('hidden');
-        elStandardModeBadge.classList.add('hidden');
-      }
     }
 
     function renderArtwork(src) {
@@ -594,17 +584,33 @@
     elBtnStopSession.addEventListener('click', stopSession);
     elCompactBtnStopSession.addEventListener('click', stopSession);
 
-    // ==========================================
-    // Apple Music / 共有テキストの高精度パーサー
-    // ==========================================
+    function jsonpFetch(url) {
+      return new Promise((resolve, reject) => {
+        const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
+        const script = document.createElement('script');
+        const sep = url.includes('?') ? '&' : '?';
+        script.src = `${url}${sep}callback=${callbackName}`;
+        
+        const cleanup = () => {
+          if (script.parentNode) script.parentNode.removeChild(script);
+          delete window[callbackName];
+        };
+
+        window[callbackName] = (data) => {
+          cleanup();
+          resolve(data);
+        };
+        script.onerror = () => {
+          cleanup();
+          reject(new Error('JSONP request failed'));
+        };
+        document.body.appendChild(script);
+      });
+    }
+
     async function parseAppleMusicOrText(rawText, rawTitle, rawUrl) {
       const fullText = `${rawTitle || ''} ${rawText || ''}`.trim();
       const extractedUrl = (rawUrl || fullText.match(/https?:\/\/[^\s]+/i)?.[0] || '').trim();
-
-      // Apple Music 共有の典型例:
-      // 例1: "Song Title" by Artist Name https://music.apple.com/...
-      // 例2: アーティストの「曲名」 https://music.apple.com/...
-      // 例3: 曲名 - アーティスト名
 
       let textOnly = fullText.replace(/https?:\/\/[^\s]+/gi, '').trim();
       let title = '';
@@ -612,29 +618,21 @@
       let album = '';
       let artworkUrl = '';
 
-      // パターン1: 「曲名」または "曲名" の引用符がある場合
       const quoteMatch = textOnly.match(/[「"『](.+?)[」"』]/);
       if (quoteMatch) {
         title = quoteMatch[1].trim();
-        // 引用符以外の部分からアーティスト名を抽出
         let rest = textOnly.replace(quoteMatch[0], '').trim();
         rest = rest.replace(/^(by|の)\s*/i, '').replace(/\s*(by|の)$/i, '').trim();
         artist = rest;
-      } 
-      // パターン2: "by" 区切り
-      else if (/\bby\b/i.test(textOnly)) {
+      } else if (/\bby\b/i.test(textOnly)) {
         const parts = textOnly.split(/\bby\b/i);
         title = parts[0].trim();
         artist = parts.slice(1).join(' by ').trim();
-      }
-      // パターン3: " - " 区切り
-      else if (textOnly.includes(' - ')) {
+      } else if (textOnly.includes(' - ')) {
         const parts = textOnly.split(' - ');
         title = parts[0].trim();
         artist = parts.slice(1).join(' - ').trim();
-      }
-      // パターン4: " / " 区切り
-      else if (textOnly.includes(' / ')) {
+      } else if (textOnly.includes(' / ')) {
         const parts = textOnly.split(' / ');
         title = parts[0].trim();
         artist = parts.slice(1).join(' / ').trim();
@@ -642,39 +640,47 @@
         title = textOnly;
       }
 
-      // iTunes Search API での補完（URLにトラックIDがある場合やタイトルが拾えた場合）
-      if (extractedUrl && extractedUrl.includes('music.apple.com')) {
+      if (extractedUrl && (extractedUrl.includes('music.apple.com') || extractedUrl.includes('itunes.apple.com'))) {
         try {
-          const trackIdMatch = extractedUrl.match(/i=(\d+)/) || extractedUrl.match(/\/(\d+)(?:\?|$)/);
-          if (trackIdMatch && trackIdMatch[1]) {
-            const appleApiUrl = `https://itunes.apple.com/lookup?id=${trackIdMatch[1]}&country=JP`;
-            const res = await fetch(appleApiUrl);
-            if (res.ok) {
-              const itunesData = await res.json();
-              if (itunesData.resultCount > 0) {
-                const item = itunesData.results[0];
-                title = item.trackName || title;
-                artist = item.artistName || artist;
-                album = item.collectionName || album;
-                if (item.artworkUrl100) {
-                  artworkUrl = item.artworkUrl100.replace('100x100bb', '600x600bb');
-                }
+          const trackIdMatch = extractedUrl.match(/[?&]i=(\d+)/) || extractedUrl.match(/\/song\/(?:[^/]+\/)?(\d+)/) || extractedUrl.match(/\/album\/(?:[^/]+\/)?(\d+)/);
+          const lookupId = trackIdMatch ? trackIdMatch[1] : '';
+
+          if (lookupId) {
+            const itunesData = await jsonpFetch(`https://itunes.apple.com/lookup?id=${lookupId}&country=JP`);
+            if (itunesData && itunesData.resultCount > 0) {
+              const item = itunesData.results[0];
+              title = item.trackName || item.collectionName || title;
+              artist = item.artistName || artist;
+              album = item.collectionName || album;
+              if (item.artworkUrl100) {
+                artworkUrl = item.artworkUrl100.replace('100x100bb', '600x600bb');
               }
             }
           }
         } catch (e) {
-          console.warn('iTunes metadata lookup failed:', e);
+          console.warn('iTunes Lookup failed:', e);
+        }
+
+        if (!title || !artist) {
+          const slugMatch = extractedUrl.match(/\/album\/([^/]+)\/|\/song\/([^/]+)\//);
+          if (slugMatch) {
+            const rawSlug = decodeURIComponent(slugMatch[1] || slugMatch[2] || '');
+            const readable = rawSlug.replace(/[-_]/g, ' ').trim();
+            if (!title) title = readable;
+          }
         }
       }
 
-      // 記号クリーンアップ
       title = (title || '').replace(/^["'『「]+|["'』」]+$/g, '').trim();
       artist = (artist || '').replace(/^["'『「]+|["'』」]+$/g, '').trim();
 
-      return { title, artist, album, artworkUrl, raw: fullText };
+      if (!title && extractedUrl) {
+        title = extractedUrl;
+      }
+
+      return { title, artist, album, artworkUrl, raw: fullText, url: extractedUrl };
     }
 
-    // 起動時の共有パラメータ検知
     async function checkIncomingShare() {
       const urlParams = new URLSearchParams(window.location.search);
       const sharedTitle = urlParams.get('title') || '';
@@ -683,18 +689,19 @@
 
       if (sharedTitle || sharedText || sharedUrl) {
         elShareDebugBanner.classList.remove('hidden');
-        elShareDebugText.textContent = `共有データ受信中: ${sharedTitle || sharedText || sharedUrl}`;
+        elShareDebugText.textContent = `共有データ受信中...`;
 
         const parsed = await parseAppleMusicOrText(sharedText, sharedTitle, sharedUrl);
         
         if (parsed.title) {
-          elShareDebugText.textContent = `認識完了: ${parsed.title} / ${parsed.artist || '不明'}`;
-          setTimeout(() => elShareDebugBanner.classList.add('hidden'), 4000);
+          const displayLabel = parsed.artist ? `${parsed.title} / ${parsed.artist}` : parsed.title;
+          elShareDebugText.textContent = `認識完了: ${displayLabel}`;
+          setTimeout(() => elShareDebugBanner.classList.add('hidden'), 5000);
 
           handleIncomingTrack({
             title: parsed.title,
-            artist: parsed.artist,
-            album: parsed.album,
+            artist: parsed.artist || 'Apple Music',
+            album: parsed.album || '',
             artwork_url: parsed.artworkUrl,
             playing: true,
             has_artwork: !!parsed.artworkUrl,
@@ -779,6 +786,86 @@
       }
     }
 
+    // 接続先アカウントで実際に使えるモデル一覧を動的に問い合わせる
+    async function getAvailableModels(apiKey) {
+      if (state.cachedModelList && state.cachedModelList.length > 0) {
+        return state.cachedModelList;
+      }
+
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.models)) {
+            const validModels = data.models
+              .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+              .map(m => m.name.replace(/^models\//, ''))
+              .filter(name => !name.includes('vision') && !name.includes('embedding'));
+
+            // Flash系を優先してソート
+            validModels.sort((a, b) => {
+              const aIsFlash = a.includes('flash');
+              const bIsFlash = b.includes('flash');
+              if (aIsFlash && !bIsFlash) return -1;
+              if (!aIsFlash && bIsFlash) return 1;
+              return b.localeCompare(a);
+            });
+
+            if (validModels.length > 0) {
+              state.cachedModelList = validModels;
+              return validModels;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to dynamically query models:', e);
+      }
+
+      return FALLBACK_MODELS;
+    }
+
+    // 動的モデル判定＋自動フォールバック対応の API 呼び出し関数
+    async function callGeminiWithFallback(apiKey, bodyObj) {
+      const candidateModels = await getAvailableModels(apiKey);
+      let lastError = null;
+
+      for (const model of candidateModels) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyObj)
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          }
+
+          const errJson = await res.json().catch(() => ({}));
+          const errMsg = errJson.error?.message || `HTTP ${res.status}`;
+          lastError = new Error(`[${model}] ${errMsg}`);
+
+          // 404や利用不可、サポート切れの場合は即座に次のモデルを試す
+          if (res.status === 404 || errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('deprecated') || errMsg.toLowerCase().includes('not supported') || errMsg.toLowerCase().includes('available')) {
+            console.warn(`Model ${model} unavailable: ${errMsg}. Trying next available model...`);
+            continue;
+          }
+
+          // 認証エラー(400/403)やレート制限(429)はそのまま投げる
+          throw lastError;
+        } catch (e) {
+          lastError = e;
+          if (e.message && (e.message.includes('404') || e.message.includes('not found') || e.message.includes('deprecated') || e.message.includes('available'))) {
+            continue;
+          }
+          throw e;
+        }
+      }
+
+      throw lastError || new Error('利用可能なGeminiモデルが見つかりませんでした。APIキーの権限をご確認ください。');
+    }
+
     async function triggerGeminiAnalysis(targetGenId) {
       if (!state.currentTrack.title || state.isAnalyzing) return;
       const apiKey = state.apiKey.trim();
@@ -837,27 +924,14 @@
         const bodyObj = {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { 
-            temperature: 0.7,
-            maxOutputTokens: 4096,
-            thinkingConfig: { thinkingBudget: 0 }
+            maxOutputTokens: 4096
           }
         };
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyObj)
-        });
+        const text = await callGeminiWithFallback(apiKey, bodyObj);
 
         if (targetGenId !== state.trackGenerationId) return;
 
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(errJson.error?.message || `HTTP ${res.status}`);
-        }
-
-        const resData = await res.json();
-        const text = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
         state.latestInsightText = text;
 
         const cleanHtml = renderCleanMarkdown(text);
@@ -874,7 +948,7 @@
 
       } catch (err) {
         if (targetGenId !== state.trackGenerationId) return;
-        const errHtml = `<div class="p-3 rounded-lg bg-rose-50 text-rose-600 text-xs">生成エラー: ${err.message}</div>`;
+        const errHtml = `<div class="p-3 rounded-lg bg-rose-50 text-rose-600 text-xs font-mono">生成エラー: ${err.message}</div>`;
         elMarkdownOutput.innerHTML = errHtml;
         elCompactMarkdown.innerHTML = errHtml;
         elAiLoading.classList.add('hidden');
@@ -908,16 +982,12 @@
       const prompt = `曲名: ${state.currentTrack.title}\nアーティスト: ${state.currentTrack.parsedArtist}\n質問: ${question}\n前置きを省き、要点を分かりやすく回答してください。`;
 
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } }
-          })
-        });
-        const resData = await res.json();
-        const answer = resData.candidates?.[0]?.content?.parts?.[0]?.text || '回答が得られませんでした。';
+        const bodyObj = {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 2048 }
+        };
+
+        const answer = await callGeminiWithFallback(state.apiKey, bodyObj);
         const idx = state.chatHistory.findIndex(i => i.id === loadingId);
         if (idx !== -1) state.chatHistory[idx] = { role: 'model', text: answer, rawMarkdown: answer, questionContext: question };
       } catch (err) {
@@ -988,6 +1058,7 @@
     elBtnCloseApiModal.addEventListener('click', () => elApiModal.classList.add('hidden'));
     elBtnSaveApiKey.addEventListener('click', () => {
       state.apiKey = elInputApiKey.value.trim();
+      state.cachedModelList = null; // キー更新時にモデル一覧を再取得
       localStorage.setItem('gemini_api_key', state.apiKey);
       elApiModal.classList.add('hidden');
       updateApiKeyStatus();
