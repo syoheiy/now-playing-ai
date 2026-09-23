@@ -25,10 +25,10 @@
 
     .prose-music h3 {
       font-weight: 700;
-      font-size: 1rem;
+      font-size: 1.05rem;
       color: #1f1f1f;
-      margin-top: 2rem;
-      margin-bottom: 0.75rem;
+      margin-top: 1.75rem;
+      margin-bottom: 0.6rem;
       display: flex;
       align-items: center;
       gap: 0.4rem;
@@ -37,7 +37,7 @@
       letter-spacing: -0.01em;
     }
     .prose-music h3:first-child {
-      margin-top: 0.5rem;
+      margin-top: 0.25rem;
     }
     .dark .prose-music h3 {
       color: #e3e3e3;
@@ -45,7 +45,7 @@
 
     .prose-music p {
       color: #1f1f1f;
-      font-size: 0.9375rem;
+      font-size: 1rem;
       line-height: 1.85;
       margin-top: 0;
       margin-bottom: 0;
@@ -66,227 +66,232 @@
 </head>
 <body class="bg-white dark:bg-slate-900 text-[#1f1f1f] dark:text-[#e3e3e3] min-h-screen flex flex-col selection:bg-sky-500/20">
 
-  <header class="border-b border-slate-200/70 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-5 py-2.5 flex items-center justify-between">
-    <div id="btn-brand-settings" class="flex items-center gap-2 cursor-pointer select-none group" title="Gemini API設定">
-      <div class="h-6 w-6 rounded-md bg-sky-600 flex items-center justify-center text-white shadow-sm group-hover:bg-sky-500 transition">
+  <!-- スリム＆フル幅ヘッダー -->
+  <header class="border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur sticky top-0 z-40 px-3 sm:px-6 py-2 flex items-center justify-between">
+    <div id="btn-brand-settings" class="flex items-center gap-2 cursor-pointer select-none group shrink-0" title="Gemini API設定">
+      <div class="h-6 w-6 rounded bg-sky-600 flex items-center justify-center text-white shadow-xs group-hover:bg-sky-500 transition">
         <i data-lucide="music-2" class="h-3.5 w-3.5"></i>
       </div>
       <span class="font-bold text-xs tracking-tight text-slate-700 dark:text-slate-300">Now Playing</span>
       <span id="api-key-indicator-dot" class="w-1.5 h-1.5 rounded-full bg-amber-500 hidden" title="APIキー未設定"></span>
     </div>
 
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1.5 shrink-0">
       <!-- ワンクリック 曲情報 共有/コピーボタン -->
-      <button id="btn-copy-track-header" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-xs font-medium transition shadow-sm" title="曲情報を共有またはコピー">
+      <button id="btn-copy-track-header" class="flex items-center gap-1 px-2.5 py-1.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition whitespace-nowrap" title="曲情報を共有またはコピー">
         <i data-lucide="share-2" class="h-3.5 w-3.5 text-slate-600 dark:text-slate-300"></i>
         <span id="btn-copy-track-text">曲情報</span>
       </button>
 
       <!-- 表示切り替えボタン（ミニマム / 標準） -->
-      <button id="btn-toggle-compact" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-xs font-medium transition shadow-sm">
+      <button id="btn-toggle-compact" class="flex items-center gap-1 px-2.5 py-1.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition whitespace-nowrap">
         <i data-lucide="minimize-2" class="h-3.5 w-3.5 text-sky-600"></i>
         <span>ミニマム</span>
       </button>
     </div>
   </header>
 
-  <!-- 受信ステータス/デバッグ用トースト -->
-  <div id="share-debug-banner" class="hidden bg-sky-50 dark:bg-sky-950/60 border-b border-sky-100 dark:border-sky-900 px-4 py-2 text-[11px] text-sky-700 dark:text-sky-300 flex items-center justify-between">
+  <!-- 受信ステータス用バナー -->
+  <div id="share-debug-banner" class="hidden bg-sky-50 dark:bg-sky-950/60 border-b border-sky-100 dark:border-sky-900 px-3 py-1.5 text-xs text-sky-700 dark:text-sky-300 flex items-center justify-between">
     <span id="share-debug-text" class="truncate">共有データを受信しました</span>
     <button onclick="this.parentElement.classList.add('hidden')" class="ml-2 text-sky-500 hover:text-sky-700">✕</button>
   </div>
 
-  <!-- ミニマム表示 -->
-  <main id="compact-view" class="flex-1 max-w-2xl w-full mx-auto px-6 py-8 flex flex-col gap-6 bg-white dark:bg-slate-900 hidden">
-    <div class="flex flex-col sm:flex-row items-center sm:items-end gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
-      <div class="w-40 h-40 flex-shrink-0 bg-slate-50 dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center relative overflow-hidden">
+  <!-- ミニマム表示：枠線を廃止し、横幅を最大活用 -->
+  <main id="compact-view" class="flex-1 w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 flex flex-col gap-4 bg-white dark:bg-slate-900 hidden">
+    <div class="flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+      <div class="w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
         <img id="compact-artwork-img" src="" alt="Artwork" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden">
         <div id="compact-artwork-fallback" class="text-slate-400 flex flex-col items-center">
-          <i data-lucide="disc-3" class="h-10 w-10 mb-1 opacity-40"></i>
-          <span class="text-[11px] font-mono">No Image</span>
+          <i data-lucide="disc-3" class="h-8 w-8 mb-1 opacity-40"></i>
+          <span class="text-[10px] font-mono">No Image</span>
         </div>
       </div>
 
-      <div class="text-center sm:text-left flex-1 min-w-0">
-        <div class="mb-1 min-h-[22px] flex items-center gap-2">
-          <span id="compact-mode-badge" class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hidden">
+      <div class="flex-1 min-w-0">
+        <div class="mb-1 flex items-center gap-1.5 flex-wrap">
+          <span id="compact-mode-badge" class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hidden">
             <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
             アルバムモード
           </span>
-          <span id="compact-session-badge" class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hidden">
+          <span id="compact-session-badge" class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hidden">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
             自動追従中
           </span>
         </div>
-        <h2 id="compact-title" class="text-xl md:text-2xl font-bold text-[#1f1f1f] dark:text-white tracking-tight leading-tight break-words">待機中</h2>
-        <p id="compact-artist" class="text-xs font-medium text-slate-600 dark:text-slate-300 mt-1.5">音楽を再生してください</p>
-        <p id="compact-album" class="text-xs text-slate-400 dark:text-slate-500 mt-0.5"></p>
+        <h2 id="compact-title" class="text-lg sm:text-xl font-bold text-[#1f1f1f] dark:text-white tracking-tight leading-snug break-words">待機中</h2>
+        <p id="compact-artist" class="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 mt-1 truncate">音楽を再生してください</p>
+        <p id="compact-album" class="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate"></p>
       </div>
     </div>
 
     <div>
-      <div class="flex items-center justify-between gap-2 pb-4 mb-2 border-b border-slate-100 dark:border-slate-800">
+      <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
         <div class="flex items-center gap-2">
-          <button id="compact-btn-start-session" class="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+          <button id="compact-btn-start-session" class="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-xs transition flex items-center gap-1.5 whitespace-nowrap">
             <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
             <span>ライナーノーツ開始</span>
           </button>
-          <button id="compact-btn-stop-session" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold shadow-sm transition hidden flex items-center gap-1.5">
+          <button id="compact-btn-stop-session" class="px-3 py-1.5 rounded bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold transition hidden flex items-center gap-1.5 whitespace-nowrap">
             <i data-lucide="square" class="h-3 w-3 fill-current"></i>
             <span>これでおしまい</span>
           </button>
         </div>
-        <button id="compact-btn-copy-notes" class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition flex items-center gap-1 hidden">
+        <button id="compact-btn-copy-notes" class="px-2.5 py-1.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition flex items-center gap-1 hidden whitespace-nowrap">
           <i data-lucide="share-2" class="h-3.5 w-3.5"></i>
           <span>解説を共有</span>
         </button>
       </div>
 
-      <div id="compact-loading" class="py-12 flex flex-col items-center justify-center gap-3 hidden">
+      <div id="compact-loading" class="py-10 flex flex-col items-center justify-center gap-3 hidden">
         <div class="w-5 h-5 rounded-full border-2 border-slate-300 border-t-sky-600 animate-spin"></div>
         <p id="compact-loading-text" class="text-xs text-slate-400 tracking-wider">ライナーノーツを生成中...</p>
       </div>
 
-      <div id="compact-placeholder" class="py-12 text-center text-xs text-slate-400">
+      <div id="compact-placeholder" class="py-10 text-center text-xs text-slate-400">
         Apple Music等から共有するか、「ライナーノーツ開始」を押すと解説が始まります。
       </div>
 
-      <div id="compact-content" class="hidden space-y-6">
+      <div id="compact-content" class="hidden space-y-4">
         <div id="compact-markdown" class="prose-music text-[#1f1f1f] dark:text-[#e3e3e3] leading-relaxed font-normal"></div>
-        <div id="compact-qa-history" class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800 hidden"></div>
+        <div id="compact-qa-history" class="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800 hidden"></div>
       </div>
     </div>
 
     <div id="compact-qa-box" class="pt-2">
-      <div class="flex flex-wrap gap-1.5 mb-2.5">
-        <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="アーティストの経歴や音楽的ルーツ、バイオグラフィを教えて">👤 プロフィール</button>
-        <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="この楽曲のコード進行やアレンジの特徴を教えて">🎼 コード進行</button>
-        <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="この演奏・録音ならではの聴きどころは？">🎻 演奏の聴きどころ</button>
-        <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="参加ミュージシャンや録音エピソードを教えて">🎙 制作裏話</button>
+      <div class="flex flex-wrap gap-1.5 mb-2">
+        <button class="qa-quick-chip px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="アーティストの経歴や音楽的ルーツ、バイオグラフィを教えて">👤 プロフィール</button>
+        <button class="qa-quick-chip px-2.5 py-1 rounded-bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="この楽曲のコード進行やアレンジの特徴を教えて">🎼 コード進行</button>
+        <button class="qa-quick-chip px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="この演奏・録音ならではの聴きどころは？">🎻 演奏の聴きどころ</button>
+        <button class="qa-quick-chip px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="参加ミュージシャンや録音エピソードを教えて">🎙 制作裏話</button>
       </div>
       <form id="compact-qa-form" class="flex items-center gap-2">
-        <input type="text" id="compact-qa-input" placeholder="曲やアルバムについてGeminiに質問..." class="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-sky-500 shadow-sm">
-        <button type="submit" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition">質問</button>
+        <input type="text" id="compact-qa-input" placeholder="曲やアルバムについてGeminiに質問..." class="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-sky-500">
+        <button type="submit" class="px-3.5 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition shrink-0 whitespace-nowrap">質問</button>
       </form>
     </div>
   </main>
 
-  <!-- 標準表示 -->
-  <main id="standard-view" class="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-    <div class="lg:col-span-5 flex flex-col gap-4">
-      <div class="rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <span id="source-app-name" class="text-xs font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            待機中
+  <!-- 標準表示：PC・スマホ共通で「無駄なカード外枠・角丸・過剰パディング」を完全撤廃 -->
+  <main id="standard-view" class="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    
+    <!-- 左ペイン：曲情報（カードで囲わず、自然なエディトリアル配置） -->
+    <div class="lg:col-span-4 xl:col-span-3 flex flex-col gap-3 lg:sticky lg:top-14">
+      <div class="flex items-center justify-between">
+        <span id="source-app-name" class="text-xs font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          待機中
+        </span>
+        <div class="flex items-center gap-1.5">
+          <span id="standard-mode-badge" class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hidden">
+            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+            アルバム
           </span>
-          <div class="flex items-center gap-2">
-            <span id="standard-mode-badge" class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 hidden">
-              <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-              アルバムモード
-            </span>
-            <span id="standard-session-badge" class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800 hidden">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              自動追従中
-            </span>
+          <span id="standard-session-badge" class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hidden">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            追従中
+          </span>
+        </div>
+      </div>
+
+      <!-- アートワーク（外枠の厚みを排し、写真そのものを主役に） -->
+      <div class="flex items-center justify-center my-1">
+        <div class="relative w-48 h-48 sm:w-56 sm:h-56 bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+          <img id="artwork-img" src="" alt="Album Artwork" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden">
+          <div id="artwork-fallback" class="flex flex-col items-center p-3 text-center">
+            <i data-lucide="disc-3" class="h-12 w-12 text-slate-400 mb-1 opacity-30"></i>
+            <span id="album-display" class="text-xs text-slate-400 line-clamp-2 font-mono">待機中</span>
           </div>
         </div>
+      </div>
 
-        <div class="flex items-center justify-center my-3">
-          <div class="relative w-44 h-44 bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center shadow-sm overflow-hidden">
-            <img id="artwork-img" src="" alt="Album Artwork" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden">
-            <div id="artwork-fallback" class="flex flex-col items-center p-3 text-center">
-              <i data-lucide="disc-3" class="h-12 w-12 text-slate-400 mb-1 opacity-30"></i>
-              <span id="album-display" class="text-xs text-slate-400 line-clamp-2 font-mono">待機中</span>
-            </div>
-          </div>
+      <div class="text-center">
+        <h2 id="track-title" class="text-base sm:text-lg font-bold text-[#1f1f1f] dark:text-white tracking-tight break-words">再生・共有を待機中</h2>
+        <p id="track-artist" class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium mt-0.5 break-words"></p>
+        <p id="track-album-sub" class="text-xs text-slate-400 dark:text-slate-500 mt-0.5 hidden font-mono break-words"></p>
+      </div>
+
+      <!-- プレイヤーコントロール -->
+      <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+        <div class="flex items-center justify-center gap-4">
+          <button id="btn-prev-track" class="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"><i data-lucide="skip-back" class="h-4 w-4"></i></button>
+          <button id="btn-play-pause" class="w-9 h-9 rounded bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center transition">
+            <i id="icon-play-pause" data-lucide="play" class="h-4 w-4 fill-current ml-0.5"></i>
+          </button>
+          <button id="btn-next-track" class="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"><i data-lucide="skip-forward" class="h-4 w-4"></i></button>
         </div>
-
-        <div class="text-center mt-3">
-          <h2 id="track-title" class="text-base font-bold text-[#1f1f1f] dark:text-white line-clamp-1 tracking-tight">再生・共有を待機中</h2>
-          <p id="track-artist" class="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1 line-clamp-1"></p>
-          <p id="track-album-sub" class="text-xs text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1 hidden font-mono"></p>
-        </div>
-
-        <div class="mt-5 pt-4 border-t border-slate-100 dark:border-slate-750 flex flex-col gap-3">
-          <div class="flex items-center justify-center gap-5">
-            <button id="btn-prev-track" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 transition"><i data-lucide="skip-back" class="h-4 w-4"></i></button>
-            <button id="btn-play-pause" class="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center shadow-sm transition">
-              <i id="icon-play-pause" data-lucide="play" class="h-4 w-4 fill-current ml-0.5"></i>
-            </button>
-            <button id="btn-next-track" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 transition"><i data-lucide="skip-forward" class="h-4 w-4"></i></button>
-          </div>
-          <div class="flex items-center gap-2 px-2 mt-1">
-            <i data-lucide="volume-2" class="h-3.5 w-3.5 text-slate-400"></i>
-            <input type="range" id="volume-slider" min="0" max="100" value="50" class="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded appearance-none accent-sky-600">
-            <span id="volume-label" class="text-[11px] font-mono w-7 text-right text-slate-400">50%</span>
-          </div>
+        <div class="flex items-center gap-2 px-1">
+          <i data-lucide="volume-2" class="h-3.5 w-3.5 text-slate-400"></i>
+          <input type="range" id="volume-slider" min="0" max="100" value="50" class="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded appearance-none accent-sky-600">
+          <span id="volume-label" class="text-[10px] font-mono w-6 text-right text-slate-400">50%</span>
         </div>
       </div>
     </div>
 
-    <div class="lg:col-span-7 flex flex-col gap-4">
-      <div class="rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm min-h-[480px] flex flex-col justify-between">
-        <div>
-          <div class="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-750 mb-5">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-bold flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-                <i data-lucide="sparkles" class="h-3.5 w-3.5 text-sky-600"></i>
-                ライナーノーツ
-              </span>
-              <span id="analysis-status-text" class="text-[11px] font-mono text-slate-400">停止中</span>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <button id="btn-copy-notes" class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200/80 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition flex items-center gap-1 hidden shadow-sm">
-                <i data-lucide="share-2" class="h-3.5 w-3.5"></i>
-                <span id="btn-copy-notes-text">解説を共有</span>
-              </button>
-
-              <button id="btn-start-session" class="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
-                <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
-                <span>ライナーノーツ開始</span>
-              </button>
-              <button id="btn-stop-session" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold shadow-sm transition hidden flex items-center gap-1.5">
-                <i data-lucide="square" class="h-3 w-3 fill-current"></i>
-                <span>これでおしまい</span>
-              </button>
-            </div>
+    <!-- 右ペイン：ライナーノーツ（カード枠を撤廃し、画面横幅いっぱいに文章を展開） -->
+    <div class="lg:col-span-8 xl:col-span-9 flex flex-col min-h-[500px] justify-between lg:pl-6 lg:border-l lg:border-slate-100 dark:lg:border-slate-800">
+      <div>
+        <!-- アクションヘッダー -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-bold flex items-center gap-1.5 text-slate-800 dark:text-slate-200 whitespace-nowrap">
+              <i data-lucide="sparkles" class="h-4 w-4 text-sky-600"></i>
+              ライナーノーツ
+            </span>
+            <span id="analysis-status-text" class="text-xs font-mono text-slate-400">停止中</span>
           </div>
 
-          <div id="ai-loading" class="py-16 flex flex-col items-center justify-center gap-3 hidden">
-            <div class="w-5 h-5 rounded-full border-2 border-slate-300 border-t-sky-600 animate-spin"></div>
-            <p id="standard-loading-text" class="text-xs text-slate-400 tracking-wider">ライナーノーツを生成中...</p>
-          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-copy-notes" class="px-2.5 py-1.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition flex items-center gap-1 hidden whitespace-nowrap">
+              <i data-lucide="share-2" class="h-3.5 w-3.5"></i>
+              <span id="btn-copy-notes-text">解説を共有</span>
+            </button>
 
-          <div id="ai-placeholder" class="py-8 px-4 flex flex-col items-center justify-center text-center">
-            <div class="w-11 h-11 rounded-2xl bg-sky-50 dark:bg-sky-950/50 border border-sky-100 dark:border-sky-900 flex items-center justify-center text-sky-600 dark:text-sky-400 mb-3 shadow-xs">
-              <i data-lucide="book-open" class="h-5 w-5"></i>
-            </div>
-            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">AI 音楽ライナーノーツ</h3>
-            <p class="text-xs text-slate-400 dark:text-slate-500 max-w-sm mt-1.5 leading-relaxed">
-              Apple MusicやSpotifyから共有するか、「ライナーノーツ開始」を押すと本格的な解説が始まります。
-            </p>
-          </div>
-
-          <div id="ai-content-body" class="space-y-4 hidden">
-            <div id="markdown-output" class="prose-music text-[#1f1f1f] dark:text-[#e3e3e3] leading-relaxed font-normal"></div>
-            <div id="standard-qa-history" class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-750 hidden"></div>
+            <button id="btn-start-session" class="px-3.5 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+              <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
+              <span>ライナーノーツ開始</span>
+            </button>
+            <button id="btn-stop-session" class="px-3.5 py-1.5 rounded bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold transition hidden flex items-center gap-1.5 whitespace-nowrap">
+              <i data-lucide="square" class="h-3 w-3 fill-current"></i>
+              <span>これでおしまい</span>
+            </button>
           </div>
         </div>
 
-        <div id="standard-qa-box" class="pt-4 border-t border-slate-100 dark:border-slate-750 mt-6">
-          <div class="flex flex-wrap gap-1.5 mb-2.5">
-            <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="アーティストの経歴や音楽的ルーツ、バイオグラフィを教えて">👤 プロフィール</button>
-            <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="この楽曲のコード進行やアレンジの特徴を教えて">🎼 コード進行</button>
-            <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="この演奏・録音ならではの聴きどころは？">🎻 演奏の聴きどころ</button>
-            <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="参加ミュージシャンや録音エピソードを教えて">🎙 制作裏話</button>
-          </div>
-          <form id="standard-qa-form" class="flex items-center gap-2">
-            <input type="text" id="standard-qa-input" placeholder="曲やアルバムについてGeminiに何でも質問..." class="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-sky-500 shadow-sm">
-            <button type="submit" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition">送信</button>
-          </form>
+        <div id="ai-loading" class="py-16 flex flex-col items-center justify-center gap-3 hidden">
+          <div class="w-6 h-6 rounded-full border-2 border-slate-300 border-t-sky-600 animate-spin"></div>
+          <p id="standard-loading-text" class="text-xs text-slate-400 tracking-wider">ライナーノーツを生成中...</p>
         </div>
+
+        <div id="ai-placeholder" class="py-12 px-2 flex flex-col items-center justify-center text-center">
+          <div class="w-10 h-10 rounded bg-sky-50 dark:bg-sky-950/50 border border-sky-100 dark:border-sky-900 flex items-center justify-center text-sky-600 dark:text-sky-400 mb-2">
+            <i data-lucide="book-open" class="h-5 w-5"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">AI 音楽ライナーノーツ</h3>
+          <p class="text-xs text-slate-400 dark:text-slate-500 max-w-sm mt-1 leading-relaxed">
+            Apple Musicから共有するか、「ライナーノーツ開始」を押すと本格的な解説が始まります。
+          </p>
+        </div>
+
+        <!-- 本文表示（外枠に囲まれず、画面の横幅をフルに使って優雅に展開） -->
+        <div id="ai-content-body" class="space-y-4 hidden">
+          <div id="markdown-output" class="prose-music text-[#1f1f1f] dark:text-[#e3e3e3] leading-relaxed font-normal"></div>
+          <div id="standard-qa-history" class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800 hidden"></div>
+        </div>
+      </div>
+
+      <!-- 下部質問フォーム -->
+      <div id="standard-qa-box" class="pt-4 border-t border-slate-100 dark:border-slate-800 mt-6">
+        <div class="flex flex-wrap gap-1.5 mb-2">
+          <button class="qa-quick-chip px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="アーティストの経歴や音楽的ルーツ、バイオグラフィを教えて">👤 プロフィール</button>
+          <button class="qa-quick-chip px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="この楽曲のコード進行やアレンジの特徴を教えて">🎼 コード進行</button>
+          <button class="qa-quick-chip px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="この演奏・録音ならではの聴きどころは？">🎻 演奏の聴きどころ</button>
+          <button class="qa-quick-chip px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="参加ミュージシャンや録音エピソードを教えて">🎙 制作裏話</button>
+        </div>
+        <form id="standard-qa-form" class="flex items-center gap-2">
+          <input type="text" id="standard-qa-input" placeholder="曲やアルバムについてGeminiに何でも質問..." class="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-sky-500">
+          <button type="submit" class="px-4 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition shrink-0 whitespace-nowrap">送信</button>
+        </form>
       </div>
     </div>
   </main>
@@ -306,7 +311,7 @@
   </div>
 
   <script>
-    // Google推奨の最新安定モデル一覧（最優先に 3.8-flash を設定）
+    // 最優先に gemini-3.8-flash を設定
     const PRIMARY_MODELS = [
       'gemini-3.8-flash',
       'gemini-3.5-flash-lite',
@@ -352,7 +357,6 @@
     const elCompactQaHistory = document.getElementById('compact-qa-history');
     const elCompactQaForm = document.getElementById('compact-qa-form');
     const elCompactQaInput = document.getElementById('compact-qa-input');
-    const elCompactModeBadge = document.getElementById('compact-mode-badge');
     const elCompactSessionBadge = document.getElementById('compact-session-badge');
     const elCompactBtnStartSession = document.getElementById('compact-btn-start-session');
     const elCompactBtnStopSession = document.getElementById('compact-btn-stop-session');
@@ -373,7 +377,6 @@
     const elStandardQaForm = document.getElementById('standard-qa-form');
     const elStandardQaInput = document.getElementById('standard-qa-input');
     const elAnalysisStatusText = document.getElementById('analysis-status-text');
-    const elStandardModeBadge = document.getElementById('standard-mode-badge');
     const elStandardSessionBadge = document.getElementById('standard-session-badge');
     const elBtnStartSession = document.getElementById('btn-start-session');
     const elBtnStopSession = document.getElementById('btn-stop-session');
@@ -791,7 +794,6 @@
       return [...PRIMARY_MODELS];
     }
 
-    // Google推奨モデルへのフォールバック関数
     async function callGeminiWithFallback(apiKey, bodyObj) {
       const candidateModels = getCandidateModels();
       let lastError = null;
@@ -808,7 +810,7 @@
             const data = await res.json();
             const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (resultText) {
-              state.workingModel = model; // 成功したモデルをキャッシュ
+              state.workingModel = model;
               return resultText;
             }
           }
@@ -817,12 +819,10 @@
           const errMsg = errJson.error?.message || `HTTP ${res.status}`;
           lastError = new Error(`[${model}] ${errMsg}`);
 
-          // APIキー自体が無効な場合のみ即終了
           if (res.status === 401 || errMsg.includes('API_KEY_INVALID') || errMsg.includes('key not valid')) {
             throw lastError;
           }
 
-          // モデル廃止・非対応等のエラーは次の候補へスキップ
           console.warn(`Model ${model} failed (${errMsg}). Trying next model...`);
           continue;
 
