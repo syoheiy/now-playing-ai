@@ -30,8 +30,8 @@
       font-weight: 700;
       font-size: 1.15rem;
       color: #0f172a;
-      margin-top: 2rem;
-      margin-bottom: 0.6rem;
+      margin-top: 2.2rem;
+      margin-bottom: 0.75rem;
       letter-spacing: -0.01em;
       line-height: 1.4;
     }
@@ -41,6 +41,20 @@
     .dark .prose-music h3 {
       color: #f1f5f9;
       border-left-color: #38bdf8;
+    }
+
+    /* サブセクション（1. 2. 3. などの小見出し）の太字・空行設定 */
+    .prose-music h4, .prose-music .sub-heading {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #0f172a;
+      margin-top: 1.8rem;
+      margin-bottom: 0.6rem;
+      line-height: 1.5;
+      display: block;
+    }
+    .dark .prose-music h4, .dark .prose-music .sub-heading {
+      color: #f1f5f9;
     }
 
     .prose-music p {
@@ -63,6 +77,22 @@
     }
     .dark .prose-music strong, .dark .prose-music b {
       color: #38bdf8;
+    }
+
+    /* 番号付きリストやサブセクション項目の余白確保 */
+    .prose-music ol {
+      margin-top: 1rem;
+      margin-bottom: 1.5rem;
+      padding-left: 0;
+      list-style-position: inside;
+    }
+    .prose-music ol > li {
+      margin-top: 1.5rem;
+      margin-bottom: 1rem;
+      line-height: 1.85;
+    }
+    .prose-music ol > li:first-child {
+      margin-top: 0.5rem;
     }
   </style>
 </head>
@@ -286,7 +316,14 @@
 
     function renderCleanMarkdown(rawMarkdown) {
       if (!rawMarkdown) return '';
-      let text = rawMarkdown.replace(/\*\*\s*([^\*\n]+?)\s*\*\*/g, '<strong>$1</strong>');
+      let text = rawMarkdown;
+
+      // 「1. 見出し」「2. 見出し」等のサブセクション行を自動検出し、太字小見出し(h4)化＆前後に十分な空行を確保
+      text = text.replace(/(?:^|\n)(\d+\.\s+[^\n:：]+)(?=\n|$)/g, '\n\n#### $1\n\n');
+
+      // 太字タグの正規化
+      text = text.replace(/\*\*\s*([^\*\n]+?)\s*\*\*/g, '<strong>$1</strong>');
+
       let html = marked.parse(text);
       return html.replace(/\*\*/g, '');
     }
@@ -751,7 +788,14 @@
       state.chatHistory.push({ role: 'model', text: '...', id: loadingId, isLoading: true });
       renderQaHistory();
 
-      const prompt = `曲名: ${state.currentTrack.title}\nアーティスト: ${state.currentTrack.parsedArtist}\n質問: ${question}\n前置きを省き、要点を分かりやすく回答してください。`;
+      const prompt = `曲名: ${state.currentTrack.title}
+アーティスト: ${state.currentTrack.parsedArtist}
+質問: ${question}
+
+回答ルール:
+1. 前置きや挨拶は一切省き、要点を分かりやすく回答してください。
+2. 「1. 結成とバンド名の由来」などの番号付きサブセクションを用いる場合は、各サブセクションの見出しを太字（#### または **1. 見出し**）にし、各サブセクションの前には必ず空行を1行設けて視認性を高めてください。
+3. 重要な固有名詞やキーワードは **太字** で強調してください。`;
 
       try {
         const bodyObj = {
