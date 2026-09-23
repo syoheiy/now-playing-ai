@@ -90,6 +90,12 @@
     </div>
   </header>
 
+  <!-- 受信ステータス/デバッグ用トースト（共有時に何が届いたかを表示） -->
+  <div id="share-debug-banner" class="hidden bg-sky-50 dark:bg-sky-950/60 border-b border-sky-100 dark:border-sky-900 px-4 py-2 text-[11px] text-sky-700 dark:text-sky-300 flex items-center justify-between">
+    <span id="share-debug-text" class="truncate">共有データを受信しました</span>
+    <button onclick="this.parentElement.classList.add('hidden')" class="ml-2 text-sky-500 hover:text-sky-700">✕</button>
+  </div>
+
   <!-- ミニマム表示 -->
   <main id="compact-view" class="flex-1 max-w-2xl w-full mx-auto px-6 py-8 flex flex-col gap-6 bg-white dark:bg-slate-900 hidden">
     <div class="flex flex-col sm:flex-row items-center sm:items-end gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
@@ -119,14 +125,13 @@
     </div>
 
     <div>
-      <!-- ミニマム セッションコントロールパネル -->
       <div class="flex items-center justify-between gap-2 pb-4 mb-2 border-b border-slate-100 dark:border-slate-800">
         <div class="flex items-center gap-2">
           <button id="compact-btn-start-session" class="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
             <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
             <span>ライナーノーツ開始</span>
           </button>
-          <button id="compact-btn-stop-session" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold shadow-sm transition hidden flex items-center gap-1.5">
+          <button id="compact-btn-stop-session" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold shadow-sm transition hidden flex items-center gap-1.5">
             <i data-lucide="square" class="h-3 w-3 fill-current"></i>
             <span>これでおしまい</span>
           </button>
@@ -143,7 +148,7 @@
       </div>
 
       <div id="compact-placeholder" class="py-12 text-center text-xs text-slate-400">
-        「ライナーノーツ開始」を押すと、本格的な解説セッションが始まります（自動追従）。
+        Apple Music等から共有するか、「ライナーノーツ開始」を押すと解説が始まります。
       </div>
 
       <div id="compact-content" class="hidden space-y-6">
@@ -168,13 +173,12 @@
 
   <!-- 標準表示 -->
   <main id="standard-view" class="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-    <!-- 左ペイン: プレイヤー -->
     <div class="lg:col-span-5 flex flex-col gap-4">
       <div class="rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm">
         <div class="flex items-center justify-between mb-4">
           <span id="source-app-name" class="text-xs font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Windows 監視中
+            待機中
           </span>
           <div class="flex items-center gap-2">
             <span id="standard-mode-badge" class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 hidden">
@@ -199,7 +203,7 @@
         </div>
 
         <div class="text-center mt-3">
-          <h2 id="track-title" class="text-base font-bold text-[#1f1f1f] dark:text-white line-clamp-1 tracking-tight">再生を待機しています</h2>
+          <h2 id="track-title" class="text-base font-bold text-[#1f1f1f] dark:text-white line-clamp-1 tracking-tight">再生・共有を待機中</h2>
           <p id="track-artist" class="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1 line-clamp-1"></p>
           <p id="track-album-sub" class="text-xs text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1 hidden font-mono"></p>
         </div>
@@ -221,11 +225,9 @@
       </div>
     </div>
 
-    <!-- 右ペイン: インサイト & セッション -->
     <div class="lg:col-span-7 flex flex-col gap-4">
       <div class="rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm min-h-[480px] flex flex-col justify-between">
         <div>
-          <!-- ヘッダーバー -->
           <div class="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-750 mb-5">
             <div class="flex items-center gap-2">
               <span class="text-xs font-bold flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
@@ -252,35 +254,27 @@
             </div>
           </div>
 
-          <!-- 生成ローディング -->
           <div id="ai-loading" class="py-16 flex flex-col items-center justify-center gap-3 hidden">
             <div class="w-5 h-5 rounded-full border-2 border-slate-300 border-t-sky-600 animate-spin"></div>
             <p id="standard-loading-text" class="text-xs text-slate-400 tracking-wider">ライナーノーツを生成中...</p>
           </div>
 
-          <!-- 未開始時の洗練されたプレースホルダー（ミニマム表示のトーンに準拠） -->
           <div id="ai-placeholder" class="py-8 px-4 flex flex-col items-center justify-center text-center">
             <div class="w-11 h-11 rounded-2xl bg-sky-50 dark:bg-sky-950/50 border border-sky-100 dark:border-sky-900 flex items-center justify-center text-sky-600 dark:text-sky-400 mb-3 shadow-xs">
               <i data-lucide="book-open" class="h-5 w-5"></i>
             </div>
             <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">AI 音楽ライナーノーツ</h3>
             <p class="text-xs text-slate-400 dark:text-slate-500 max-w-sm mt-1.5 leading-relaxed">
-              「ライナーノーツ開始」を押すと、再生中の楽曲・アルバムに合わせた本格的な解説セッションが始まります（自動追従・離席時自動停止）。
+              Apple MusicやSpotifyから共有するか、「ライナーノーツ開始」を押すと本格的な解説が始まります。
             </p>
-            <div class="mt-5 p-3 rounded-xl bg-slate-50 dark:bg-slate-850/70 border border-slate-200/60 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2 max-w-md">
-              <i data-lucide="info" class="h-4 w-4 text-sky-600 flex-shrink-0"></i>
-              <span>解説を生成しなくても、下部のクイック質問からプロフィールやコード進行などをピンポイント（省トークン）で確認できます。</span>
-            </div>
           </div>
 
-          <!-- ライナーノーツ本文 & 回答履歴 -->
           <div id="ai-content-body" class="space-y-4 hidden">
             <div id="markdown-output" class="prose-music text-[#1f1f1f] dark:text-[#e3e3e3] leading-relaxed font-normal"></div>
             <div id="standard-qa-history" class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-750 hidden"></div>
           </div>
         </div>
 
-        <!-- QAフッターエリア -->
         <div id="standard-qa-box" class="pt-4 border-t border-slate-100 dark:border-slate-750 mt-6">
           <div class="flex flex-wrap gap-1.5 mb-2.5">
             <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="アーティストの経歴や音楽的ルーツ、バイオグラフィを教えて">👤 プロフィール</button>
@@ -324,30 +318,22 @@
         app: '', 
         playing: false, 
         hasArtwork: false, 
+        artworkUrl: '',
         artworkSeq: 0 
       },
       isAnalyzing: false,
       latestInsightText: '',
       chatHistory: [],
       trackGenerationId: 0,
-      
-      // セッション＆追従管理
-      isSessionActive: false, // ユーザーが開始を押すまで完全停止（0円）
+      isSessionActive: false,
       activeAlbumKey: '',
       consecutiveCount: 0,
-      isAlbumMode: false,
-      
-      // メモリ専用キャッシュ（ディスク保存ゼロ、離脱時即破棄）
-      albumMemoryCache: {
-        albumKey: '',
-        commonInsight: ''
-      }
+      isAlbumMode: false
     };
 
     let isUserDraggingSlider = false;
     let lockDetectionTimer = null;
 
-    // UI要素の取得
     const elStandardView = document.getElementById('standard-view');
     const elCompactView = document.getElementById('compact-view');
     const elBtnToggleCompact = document.getElementById('btn-toggle-compact');
@@ -399,6 +385,10 @@
     const elVolumeSlider = document.getElementById('volume-slider');
     const elVolumeLabel = document.getElementById('volume-label');
     const elBtnNext = document.getElementById('btn-next-track');
+    const elSourceAppName = document.getElementById('source-app-name');
+
+    const elShareDebugBanner = document.getElementById('share-debug-banner');
+    const elShareDebugText = document.getElementById('share-debug-text');
 
     const elApiModal = document.getElementById('api-modal');
     const elBtnBrandSettings = document.getElementById('btn-brand-settings');
@@ -425,20 +415,12 @@
       return html.replace(/\*\*/g, '');
     }
 
-    // クリップボード用のMarkdown正規化（各セクション見出しの前後に必ず空行を挿入）
     function formatMarkdownForClipboard(rawText) {
       if (!rawText) return '';
       let text = rawText.trim();
-      
-      // 見出し行（### 見出し）の前に空行がない場合は挿入
       text = text.replace(/([^\n])\n(#{1,6}\s+[^\n]+)/g, '$1\n\n$2');
-      
-      // 見出し行の直後に空行がない場合は挿入
       text = text.replace(/(#{1,6}\s+[^\n]+)\n([^\n#])/g, '$1\n\n$2');
-      
-      // 3つ以上の連続改行は2つ（標準の1空行）に正規化
       text = text.replace(/\n{3,}/g, '\n\n');
-      
       return text;
     }
 
@@ -446,21 +428,6 @@
       return (str || '').trim().toLowerCase().replace(/[\s\u3000\-_—]/g, '');
     }
 
-    function parseArtistAndAlbum(rawArtist, rawAlbum) {
-      let artist = (rawArtist || '').trim();
-      let album = (rawAlbum || '').trim();
-
-      if (!album && (artist.includes('—') || artist.includes(' - '))) {
-        const parts = artist.includes('—') ? artist.split('—') : artist.split(' - ');
-        if (parts.length >= 2) {
-          artist = parts[0].trim();
-          album = parts.slice(1).join('—').trim();
-        }
-      }
-      return { artist, album };
-    }
-
-    // セッション表示・バッジ制御
     function updateSessionUI() {
       if (state.isSessionActive) {
         elBtnStartSession.classList.add('hidden');
@@ -491,33 +458,8 @@
       }
     }
 
-    function evaluateContinuity(parsedArtist, parsedAlbum) {
-      const rawKey = parsedAlbum ? `${parsedArtist}:::${parsedAlbum}` : parsedArtist;
-      const currentKey = normalizeKey(rawKey);
-
-      if (!currentKey) return;
-
-      if (currentKey === state.activeAlbumKey) {
-        state.consecutiveCount += 1;
-      } else {
-        state.activeAlbumKey = currentKey;
-        state.consecutiveCount = 1;
-
-        // アルバムが変わったらメモリキャッシュを即座に破棄（クリーンアップ）
-        if (state.albumMemoryCache.albumKey !== currentKey) {
-          state.albumMemoryCache.albumKey = '';
-          state.albumMemoryCache.commonInsight = '';
-        }
-      }
-
-      state.isAlbumMode = (state.consecutiveCount >= 3);
-      updateModeBadges();
-    }
-
-    // アートワーク描画
-    function renderArtwork(hasArtwork, seq) {
-      if (hasArtwork && seq > 0) {
-        const url = `/api/artwork?seq=${seq}&t=${Date.now()}`;
+    function renderArtwork(src) {
+      if (src) {
         elArtworkImg.onload = () => {
           elArtworkImg.classList.remove('hidden');
           elArtworkFallback.classList.add('hidden');
@@ -526,8 +468,8 @@
           elCompactArtworkImg.classList.remove('hidden');
           elCompactArtworkFallback.classList.add('hidden');
         };
-        elArtworkImg.src = url;
-        elCompactArtworkImg.src = url;
+        elArtworkImg.src = src;
+        elCompactArtworkImg.src = src;
       } else {
         elArtworkImg.classList.add('hidden');
         elArtworkFallback.classList.remove('hidden');
@@ -564,45 +506,30 @@
       applyViewMode();
     });
 
-    // 汎用: Web Share API または クリップボードコピーのハイブリッド共有
-    async function shareOrCopyText({ title, text, btnElement, textElement, originalLabel }) {
+    async function shareOrCopyText({ title, text, textElement, originalLabel }) {
       if (!text) return;
-
-      // 1. AndroidやWindowsのOS標準 共有シートが利用可能な場合
       if (navigator.share) {
         try {
-          await navigator.share({
-            title: title || 'Now Playing',
-            text: text
-          });
-          return; // 共有成功
+          await navigator.share({ title: title || 'Now Playing', text: text });
+          return;
         } catch (err) {
-          if (err.name === 'AbortError') return; // ユーザーがキャンセルした場合は何もしない
-          // 共有失敗時は下のクリップボードフォールバックへ
+          if (err.name === 'AbortError') return;
         }
       }
-
-      // 2. 共有非対応、または失敗時のクリップボードコピー
       try {
         await navigator.clipboard.writeText(text);
         if (textElement) {
           textElement.textContent = '完了!';
-          setTimeout(() => {
-            textElement.textContent = originalLabel;
-          }, 1500);
+          setTimeout(() => { textElement.textContent = originalLabel; }, 1500);
         }
-      } catch (err) {
-        console.error('共有・コピー失敗:', err);
-      }
+      } catch (err) {}
     }
 
-    // 1. ワンクリック「曲情報」の共有
     async function handleShareTrackInfo() {
       if (!state.currentTrack.title) return;
       const title = state.currentTrack.title;
       const artist = state.currentTrack.parsedArtist || state.currentTrack.artist;
       const album = state.currentTrack.parsedAlbum || state.currentTrack.album;
-
       const formatted = album ? `${title} / ${artist} - 『${album}』` : `${title} / ${artist}`;
 
       await shareOrCopyText({
@@ -614,7 +541,6 @@
     }
     elBtnCopyTrackHeader.addEventListener('click', handleShareTrackInfo);
 
-    // 2. ワンクリック「ライナーノーツ」の共有
     async function handleShareLinerNotes(isCompact = false) {
       if (!state.latestInsightText) return;
       const title = state.currentTrack.title;
@@ -626,19 +552,16 @@
       const fullText = metaHeader + formattedBody;
 
       const labelEl = isCompact ? elCompactBtnCopyNotes.querySelector('span') : elBtnCopyNotesText;
-      const originalText = isCompact ? '解説を共有' : '解説を共有';
-
       await shareOrCopyText({
         title: `ライナーノーツ: ${title} / ${artist}`,
         text: fullText,
         textElement: labelEl,
-        originalLabel: originalText
+        originalLabel: '解説を共有'
       });
     }
     elBtnCopyNotes.addEventListener('click', () => handleShareLinerNotes(false));
     elCompactBtnCopyNotes.addEventListener('click', () => handleShareLinerNotes(true));
 
-    // 3. セッション管理（開始 / おしまい）
     function startSession() {
       state.isSessionActive = true;
       updateSessionUI();
@@ -651,27 +574,16 @@
       state.isSessionActive = false;
       state.isAnalyzing = false;
       state.latestInsightText = '';
-      
-      // メモリキャッシュも破棄
-      state.albumMemoryCache.albumKey = '';
-      state.albumMemoryCache.commonInsight = '';
-
-      // 表示中のライナーノーツ本文とコピーボタンを非表示化・クリア
       elMarkdownOutput.innerHTML = '';
       elCompactMarkdown.innerHTML = '';
       elAiContentBody.classList.add('hidden');
       elCompactContent.classList.add('hidden');
       elBtnCopyNotes.classList.add('hidden');
       elCompactBtnCopyNotes.classList.add('hidden');
-
-      // 初期の案内プレースホルダーを再表示
       elAiPlaceholder.classList.remove('hidden');
       elCompactPlaceholder.classList.remove('hidden');
-
-      // QA履歴もクリア
       state.chatHistory = [];
       renderQaHistory();
-
       updateSessionUI();
       elAiLoading.classList.add('hidden');
       elCompactLoading.classList.add('hidden');
@@ -682,122 +594,124 @@
     elBtnStopSession.addEventListener('click', stopSession);
     elCompactBtnStopSession.addEventListener('click', stopSession);
 
-    // 4. 安全弁：Windows画面ロック・離席センサー（画面消灯）検知
-    // 画面が非表示になって1分経過したら、自動でセッションを終了（0円防御）
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        if (state.isSessionActive) {
-          lockDetectionTimer = setTimeout(() => {
-            console.log('離席・画面消灯を検知：ライナーノーツセッションを安全停止しました。');
-            stopSession();
-          }, 60000); // 1分後に完全シャットダウン
-        }
-      } else {
-        if (lockDetectionTimer) {
-          clearTimeout(lockDetectionTimer);
-          lockDetectionTimer = null;
-        }
-      }
-    });
+    // ==========================================
+    // Apple Music / 共有テキストの高精度パーサー
+    // ==========================================
+    async function parseAppleMusicOrText(rawText, rawTitle, rawUrl) {
+      const fullText = `${rawTitle || ''} ${rawText || ''}`.trim();
+      const extractedUrl = (rawUrl || fullText.match(/https?:\/\/[^\s]+/i)?.[0] || '').trim();
 
-    applyViewMode();
-    updateApiKeyStatus();
-    updateModeBadges();
-    updateSessionUI();
+      // Apple Music 共有の典型例:
+      // 例1: "Song Title" by Artist Name https://music.apple.com/...
+      // 例2: アーティストの「曲名」 https://music.apple.com/...
+      // 例3: 曲名 - アーティスト名
 
-    // メディア制御
-    async function sendControl(action, value = null) {
-      try {
-        await fetch('/api/control', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, value })
-        });
-        setTimeout(pollSmtcBridge, 150);
-        setTimeout(pollSmtcBridge, 500);
-      } catch (e) {}
-    }
-
-    elBtnPlayPause.addEventListener('click', () => {
-      const nextStatus = !state.currentTrack.playing;
-      state.currentTrack.playing = nextStatus;
-      updatePlayPauseIcon(nextStatus);
-      sendControl('play_pause');
-    });
-
-    elBtnPrev.addEventListener('click', () => sendControl('previous'));
-    elBtnNext.addEventListener('click', () => sendControl('next'));
-
-    elVolumeSlider.addEventListener('mousedown', () => { isUserDraggingSlider = true; });
-    elVolumeSlider.addEventListener('mouseup', () => { isUserDraggingSlider = false; });
-    elVolumeSlider.addEventListener('input', (e) => {
-      elVolumeLabel.textContent = `${e.target.value}%`;
-      sendControl('set_volume', e.target.value);
-    });
-
-    // Androidの共有テキストから曲名とアーティストを解析する関数
-    function parseSharedTrackText(rawText, rawTitle) {
-      let combined = (rawText || '') + ' ' + (rawTitle || '');
-      // URLを除去
-      combined = combined.replace(/https?:\/\/\S+/gi, '').trim();
-
+      let textOnly = fullText.replace(/https?:\/\/[^\s]+/gi, '').trim();
       let title = '';
       let artist = '';
       let album = '';
+      let artworkUrl = '';
 
-      // 一般的な区切りパターンを解析
-      if (combined.includes(' - ')) {
-        const parts = combined.split(' - ');
-        artist = parts[0].trim();
-        title = parts.slice(1).join(' - ').trim();
-      } else if (combined.includes(' / ')) {
-        const parts = combined.split(' / ');
-        title = parts[0].trim();
-        artist = parts.slice(1).join(' / ').trim();
-      } else if (combined.toLowerCase().includes(' by ')) {
-        const parts = combined.split(/ by /i);
+      // パターン1: 「曲名」または "曲名" の引用符がある場合
+      const quoteMatch = textOnly.match(/[「"『](.+?)[」"』]/);
+      if (quoteMatch) {
+        title = quoteMatch[1].trim();
+        // 引用符以外の部分からアーティスト名を抽出
+        let rest = textOnly.replace(quoteMatch[0], '').trim();
+        rest = rest.replace(/^(by|の)\s*/i, '').replace(/\s*(by|の)$/i, '').trim();
+        artist = rest;
+      } 
+      // パターン2: "by" 区切り
+      else if (/\bby\b/i.test(textOnly)) {
+        const parts = textOnly.split(/\bby\b/i);
         title = parts[0].trim();
         artist = parts.slice(1).join(' by ').trim();
+      }
+      // パターン3: " - " 区切り
+      else if (textOnly.includes(' - ')) {
+        const parts = textOnly.split(' - ');
+        title = parts[0].trim();
+        artist = parts.slice(1).join(' - ').trim();
+      }
+      // パターン4: " / " 区切り
+      else if (textOnly.includes(' / ')) {
+        const parts = textOnly.split(' / ');
+        title = parts[0].trim();
+        artist = parts.slice(1).join(' / ').trim();
       } else {
-        title = combined;
-        artist = 'アーティスト不明';
+        title = textOnly;
       }
 
-      // 引用符や装飾をトリミング
-      title = title.replace(/^["'『「]+|["'』」]+$/g, '').trim();
-      artist = artist.replace(/^["'『「]+|["'』」]+$/g, '').trim();
+      // iTunes Search API での補完（URLにトラックIDがある場合やタイトルが拾えた場合）
+      if (extractedUrl && extractedUrl.includes('music.apple.com')) {
+        try {
+          const trackIdMatch = extractedUrl.match(/i=(\d+)/) || extractedUrl.match(/\/(\d+)(?:\?|$)/);
+          if (trackIdMatch && trackIdMatch[1]) {
+            const appleApiUrl = `https://itunes.apple.com/lookup?id=${trackIdMatch[1]}&country=JP`;
+            const res = await fetch(appleApiUrl);
+            if (res.ok) {
+              const itunesData = await res.json();
+              if (itunesData.resultCount > 0) {
+                const item = itunesData.results[0];
+                title = item.trackName || title;
+                artist = item.artistName || artist;
+                album = item.collectionName || album;
+                if (item.artworkUrl100) {
+                  artworkUrl = item.artworkUrl100.replace('100x100bb', '600x600bb');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('iTunes metadata lookup failed:', e);
+        }
+      }
 
-      return { title, artist, album };
+      // 記号クリーンアップ
+      title = (title || '').replace(/^["'『「]+|["'』」]+$/g, '').trim();
+      artist = (artist || '').replace(/^["'『「]+|["'』」]+$/g, '').trim();
+
+      return { title, artist, album, artworkUrl, raw: fullText };
     }
 
-    // AndroidのWeb Share Target（URLパラメータ）からの起動を検知
-    function checkIncomingShare() {
+    // 起動時の共有パラメータ検知
+    async function checkIncomingShare() {
       const urlParams = new URLSearchParams(window.location.search);
       const sharedTitle = urlParams.get('title') || '';
       const sharedText = urlParams.get('text') || '';
       const sharedUrl = urlParams.get('url') || '';
 
       if (sharedTitle || sharedText || sharedUrl) {
-        const parsed = parseSharedTrackText(sharedText, sharedTitle);
+        elShareDebugBanner.classList.remove('hidden');
+        elShareDebugText.textContent = `共有データ受信中: ${sharedTitle || sharedText || sharedUrl}`;
+
+        const parsed = await parseAppleMusicOrText(sharedText, sharedTitle, sharedUrl);
+        
         if (parsed.title) {
+          elShareDebugText.textContent = `認識完了: ${parsed.title} / ${parsed.artist || '不明'}`;
+          setTimeout(() => elShareDebugBanner.classList.add('hidden'), 4000);
+
           handleIncomingTrack({
             title: parsed.title,
             artist: parsed.artist,
             album: parsed.album,
+            artwork_url: parsed.artworkUrl,
             playing: true,
-            has_artwork: false,
-            artwork_seq: 0
+            has_artwork: !!parsed.artworkUrl,
+            artwork_seq: 0,
+            app: 'Apple Music'
           });
-          // 共有されたらすぐに読めるよう自動でセッション開始
+
           startSession();
+        } else {
+          elShareDebugText.textContent = `解析できませんでした: ${parsed.raw}`;
         }
       }
     }
 
     async function pollSmtcBridge() {
-      // 共有パラメータから開かれた場合はWindowsサーバーへのポーリングをスキップ
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('title') || urlParams.get('text')) return;
+      if (urlParams.get('title') || urlParams.get('text') || urlParams.get('url')) return;
 
       try {
         const res = await fetch('/api/track');
@@ -809,21 +723,8 @@
     }
     setInterval(pollSmtcBridge, 1000);
 
-    // 起動時にAndroid共有パラメータをチェック
-    checkIncomingShare();
-
     function handleIncomingTrack(data) {
       if (!data) return;
-
-      if (data.volume !== undefined && !isUserDraggingSlider) {
-        elVolumeSlider.value = data.volume;
-        elVolumeLabel.textContent = `${data.volume}%`;
-      }
-
-      if (data.playing !== undefined && data.playing !== state.currentTrack.playing) {
-        state.currentTrack.playing = data.playing;
-        updatePlayPauseIcon(data.playing);
-      }
 
       const trackTitle = (data.title || '').trim();
       const rawArtist = (data.artist || '').trim();
@@ -836,56 +737,44 @@
         state.trackGenerationId++;
         const currentGenId = state.trackGenerationId;
 
-        const { artist, album } = parseArtistAndAlbum(rawArtist, rawAlbum);
-
         state.currentTrack.title = trackTitle;
         state.currentTrack.artist = rawArtist;
         state.currentTrack.album = rawAlbum;
-        state.currentTrack.parsedArtist = artist;
-        state.currentTrack.parsedAlbum = album;
+        state.currentTrack.parsedArtist = rawArtist;
+        state.currentTrack.parsedAlbum = rawAlbum;
 
         elTrackTitle.textContent = trackTitle;
-        elTrackArtist.textContent = artist;
-        if (album) {
-          elTrackAlbumSub.textContent = album;
+        elTrackArtist.textContent = rawArtist;
+        if (rawAlbum) {
+          elTrackAlbumSub.textContent = rawAlbum;
           elTrackAlbumSub.classList.remove('hidden');
-          elAlbumDisplay.textContent = album;
+          elAlbumDisplay.textContent = rawAlbum;
         } else {
           elTrackAlbumSub.classList.add('hidden');
-          elAlbumDisplay.textContent = artist;
+          elAlbumDisplay.textContent = rawArtist;
         }
 
         elCompactTitle.textContent = trackTitle;
-        elCompactArtist.textContent = artist;
-        elCompactAlbum.textContent = album ? album : '';
+        elCompactArtist.textContent = rawArtist;
+        elCompactAlbum.textContent = rawAlbum ? rawAlbum : '';
 
-        // ジャケット描画
-        if (data.has_artwork && data.artwork_seq > 0) {
-          state.currentTrack.hasArtwork = true;
-          state.currentTrack.artworkSeq = data.artwork_seq;
-          renderArtwork(true, data.artwork_seq);
+        if (data.artwork_url) {
+          renderArtwork(data.artwork_url);
+        } else if (data.has_artwork && data.artwork_seq > 0) {
+          renderArtwork(`/api/artwork?seq=${data.artwork_seq}&t=${Date.now()}`);
         } else {
-          state.currentTrack.hasArtwork = false;
-          state.currentTrack.artworkSeq = 0;
-          renderArtwork(false, 0);
+          renderArtwork('');
+        }
+
+        if (data.app) {
+          elSourceAppName.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> ${data.app}`;
         }
 
         state.chatHistory = [];
         renderQaHistory();
 
-        // アルバム連続性の判定
-        evaluateContinuity(state.currentTrack.parsedArtist, state.currentTrack.parsedAlbum);
-
-        // ★重要：セッションがONの時だけ自動追従（OFFの時は完全停止で0円）
         if (state.isSessionActive) {
           triggerGeminiAnalysis(currentGenId);
-        }
-
-      } else {
-        if (data.has_artwork && data.artwork_seq > state.currentTrack.artworkSeq) {
-          state.currentTrack.hasArtwork = true;
-          state.currentTrack.artworkSeq = data.artwork_seq;
-          renderArtwork(true, data.artwork_seq);
         }
       }
     }
@@ -898,14 +787,13 @@
         elAiContentBody.classList.remove('hidden');
         elCompactPlaceholder.classList.add('hidden');
         elCompactContent.classList.remove('hidden');
-        const errHtml = '<div class="p-3 rounded-lg bg-amber-50 text-amber-700 text-xs">右上の歯車アイコンから Gemini API キーを設定してください。</div>';
+        const errHtml = '<div class="p-3 rounded-lg bg-amber-50 text-amber-700 text-xs">左上のアイコンから Gemini API キーを設定してください。</div>';
         elMarkdownOutput.innerHTML = errHtml;
         elCompactMarkdown.innerHTML = errHtml;
         return;
       }
 
       state.isAnalyzing = true;
-
       elAiPlaceholder.classList.add('hidden');
       elCompactPlaceholder.classList.add('hidden');
       elAiContentBody.classList.add('hidden');
@@ -916,41 +804,12 @@
       elCompactBtnCopyNotes.classList.add('hidden');
 
       elAnalysisStatusText.textContent = '解析中...';
-      elCompactLoadingText.textContent = state.isAlbumMode ? 'アルバムの世界観と楽曲を解析中...' : '楽曲・演奏・プロフィールを解析中...';
-      elStandardLoadingText.textContent = state.isAlbumMode ? 'アルバムライナーノーツを生成中...' : '解説を生成中...';
+      elCompactLoadingText.textContent = 'ライナーノーツを生成中...';
+      elStandardLoadingText.textContent = '解説を生成中...';
 
-      let prompt = '';
       const artist = state.currentTrack.parsedArtist;
-      const album = state.currentTrack.parsedAlbum || artist;
-
-      if (state.isAlbumMode) {
-        prompt = `リスナーは現在、アルバム『${album}』の楽曲群を集中して楽しんでいます（再生順は問わず、作品の世界観を味わっています）。
-アーティスト: ${artist}
-アルバム名: ${album}
-現在再生中のトラック: ${state.currentTrack.title}
-
-アルバム全体の大局的な視点と、現在再生中の楽曲の魅力を両立させた本格的な音楽ライナーノーツを作成してください。
-
-絶対厳守の執筆ルール:
-1. 【前置き・挨拶の完全禁止】
-   前置き文は1文字も書かず、1行目からいきなり「### アルバム『${album}』の時代背景とコンセプト」で開始してください。
-2. 【見出しと構成（空行の徹底）】
-   頭から順番に聴いていること（曲順）を前提とせず、以下の3つの見出しで各パートをしっかり詳しく記述してください。
-   ★各見出し（###）の直前と直後には必ず空行を1行空けて、セクションを明確に区切ってください：
-
-   ### アルバム『${album}』の時代背景とコンセプト
-
-   ### 作品全体のサウンドメイキングと音楽的特徴
-
-   ### 本作における「${state.currentTrack.title}」の魅力と位置づけ
-
-3. 【事実の正確性とクレジットの徹底】
-   - アルバムのリリース年、プロデューサー、参加ミュージシャン、時代的背景を正確に記述してください。
-   - 3つ目のセクションでは、曲順の前後関係には触れず、このアルバムを彩る重要なピースとしての「${state.currentTrack.title}」の音楽的魅力、アレンジ、聴きどころを解説してください。
-4. 【太字強調のルール】
-   - アーティスト名、重要人名、年代表記（例: 1976年リリース）、コード進行、キーとなる音楽用語は太字（**単語**）で強調してください。`;
-      } else {
-        prompt = `現在再生中の以下の楽曲について、本格的な音楽ライナーノーツを作成してください。
+      const album = state.currentTrack.parsedAlbum;
+      const prompt = `現在再生中の以下の楽曲について、本格的な音楽ライナーノーツを作成してください。
 曲名: ${state.currentTrack.title}
 アーティスト: ${artist}
 アルバム: ${album || 'シングル / 不明'}
@@ -960,7 +819,7 @@
    前置き文は1文字も書かず、1行目からいきなり「### アーティストと楽曲の背景」で開始してください。
 2. 【見出しと構成（空行の徹底）】
    必ず以下の3つの見出しを使用し、各パートをしっかり詳しく記述してください。
-   ★各見出し（###）の直前と直後には必ず空行を1行空けて、セクションを明確に区切ってください：
+   各見出し（###）の直前と直後には必ず空行を1行空けてください：
 
    ### アーティストと楽曲の背景
 
@@ -969,12 +828,10 @@
    ### 聴きどころと位置づけ
 
 3. 【事実の正確性とクレジットの徹底】
-   - 作詞・作曲・編曲者、リリース年、参加ミュージシャンなどの固有名詞は、曖昧な推測や他曲との混同を避け、正確な公式クレジットに基づいて記述してください。
-   - アーティストの出自・音楽的ルーツや特徴、キャリア全体における本作の重要性を詳しく紹介してください。
-   - 楽曲の初出リリース年（およびアルバム発売年）を必ず明記してください。洋楽の場合は原題と邦題を併記してください。
+   - 作詞・作曲・編曲者、リリース年、参加ミュージシャンなどの固有名詞を正確に記述してください。
+   - アーティストの出自・音楽的ルーツや特徴を詳しく紹介してください。
 4. 【太字強調のルール】
-   - アーティスト名、重要人名、年代表記（例: 1976年リリース）、コード進行、キーとなる音楽用語は太字（**単語**）で強調してください。`;
-      }
+   - アーティスト名、重要人名、年代表記、コード進行、キーとなる音楽用語は太字（**単語**）で強調してください。`;
 
       try {
         const bodyObj = {
@@ -982,14 +839,11 @@
           generationConfig: { 
             temperature: 0.7,
             maxOutputTokens: 4096,
-            thinkingConfig: {
-              thinkingBudget: 0
-            }
+            thinkingConfig: { thinkingBudget: 0 }
           }
         };
 
-        const model = 'gemini-3.6-flash';
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(bodyObj)
@@ -1003,8 +857,6 @@
         }
 
         const resData = await res.json();
-        if (targetGenId !== state.trackGenerationId) return;
-
         const text = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
         state.latestInsightText = text;
 
@@ -1018,11 +870,10 @@
         elCompactContent.classList.remove('hidden');
         elBtnCopyNotes.classList.remove('hidden');
         elCompactBtnCopyNotes.classList.remove('hidden');
-        elAnalysisStatusText.textContent = state.isAlbumMode ? `完了 (アルバムモード)` : `完了 (${model})`;
+        elAnalysisStatusText.textContent = '完了';
 
       } catch (err) {
         if (targetGenId !== state.trackGenerationId) return;
-
         const errHtml = `<div class="p-3 rounded-lg bg-rose-50 text-rose-600 text-xs">生成エラー: ${err.message}</div>`;
         elMarkdownOutput.innerHTML = errHtml;
         elCompactMarkdown.innerHTML = errHtml;
@@ -1042,7 +893,6 @@
       if (!q || !q.trim() || !state.apiKey) return;
       const question = q.trim();
 
-      // セッション停止中であっても、質問時は回答枠を表示してプレースホルダーを隠す
       elAiPlaceholder.classList.add('hidden');
       elCompactPlaceholder.classList.add('hidden');
       elAiContentBody.classList.remove('hidden');
@@ -1055,34 +905,16 @@
       state.chatHistory.push({ role: 'model', text: '...', id: loadingId, isLoading: true });
       renderQaHistory();
 
-      const prompt = `現在再生中の情報:
-- 曲名: ${state.currentTrack.title}
-- アーティスト: ${state.currentTrack.parsedArtist}
-- アルバム: ${state.currentTrack.parsedAlbum}
-- モード: ${state.isAlbumMode ? 'アルバムモード' : '通常'}
-- 直前の解説文: ${state.latestInsightText || '（ライナーノーツ未生成）'}
-
-質問:
-${question}
-
-指示: 前置きの挨拶は省き、要点を分かりやすく回答してください。重要な言葉や年代・人名は太字にしてください。`;
+      const prompt = `曲名: ${state.currentTrack.title}\nアーティスト: ${state.currentTrack.parsedArtist}\n質問: ${question}\n前置きを省き、要点を分かりやすく回答してください。`;
 
       try {
-        const bodyObj = {
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { 
-            temperature: 0.7,
-            maxOutputTokens: 2048,
-            thinkingConfig: {
-              thinkingBudget: 0
-            }
-          }
-        };
-
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${state.apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyObj)
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } }
+          })
         });
         const resData = await res.json();
         const answer = resData.candidates?.[0]?.content?.parts?.[0]?.text || '回答が得られませんでした。';
@@ -1094,25 +926,6 @@ ${question}
       } finally {
         renderQaHistory();
       }
-    }
-
-    async function copyQaAnswer(rawText, btnElement, questionContext = '') {
-      if (!rawText) return;
-      const title = state.currentTrack.title;
-      const artist = state.currentTrack.parsedArtist || state.currentTrack.artist;
-      const album = state.currentTrack.parsedAlbum || state.currentTrack.album;
-
-      const header = title ? `### ${questionContext ? `${questionContext} - ` : ''}${title} / ${artist}${album ? ` (アルバム: ${album})` : ''}\n\n` : '';
-      const formatted = formatMarkdownForClipboard(rawText);
-      const fullText = header + formatted;
-
-      const textSpan = btnElement.querySelector('.copy-label');
-      await shareOrCopyText({
-        title: `${questionContext || '音楽メモ'} - ${title} / ${artist}`,
-        text: fullText,
-        textElement: textSpan,
-        originalLabel: '共有'
-      });
     }
 
     function renderQaHistory() {
@@ -1133,30 +946,11 @@ ${question}
                 <div class="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-3.5 py-2.5 text-xs leading-relaxed shadow-sm border border-slate-200/80 dark:border-slate-700/80 prose-music">
                   ${item.isLoading ? '<span class="inline-flex items-center gap-1.5 text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>思考中...</span>' : renderCleanMarkdown(item.text)}
                 </div>
-                ${!item.isLoading && item.rawMarkdown ? `
-                  <button class="qa-copy-btn flex items-center gap-1 px-2 py-1 rounded-md bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-[11px] font-medium transition shadow-xs" data-qa-idx="${index}">
-                    <span class="copy-icon flex items-center"><i data-lucide="share-2" class="h-3 w-3 text-slate-500 dark:text-slate-400"></i></span>
-                    <span class="copy-label text-slate-600 dark:text-slate-300">共有</span>
-                  </button>
-                ` : ''}
               </div>
             `;
           }
         }).join('');
-
-        // 共有ボタンのイベントリスナーを設定
-        container.querySelectorAll('.qa-copy-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const idx = parseInt(btn.getAttribute('data-qa-idx'), 10);
-            const target = state.chatHistory[idx];
-            if (target && target.rawMarkdown) {
-              copyQaAnswer(target.rawMarkdown, btn, target.questionContext);
-            }
-          });
-        });
       };
-
       render(elStandardQaHistory);
       render(elCompactQaHistory);
       safeCreateIcons();
@@ -1197,8 +991,8 @@ ${question}
       localStorage.setItem('gemini_api_key', state.apiKey);
       elApiModal.classList.add('hidden');
       updateApiKeyStatus();
-      if (state.isSessionActive && state.currentTrack.title) {
-        triggerGeminiAnalysis(state.trackGenerationId);
+      if (state.currentTrack.title) {
+        startSession();
       }
     });
 
@@ -1206,6 +1000,10 @@ ${question}
       if (state.apiKey) elApiKeyDot.classList.add('hidden');
       else elApiKeyDot.classList.remove('hidden');
     }
+
+    applyViewMode();
+    updateApiKeyStatus();
+    checkIncomingShare();
   </script>
   <script>
     if ('serviceWorker' in navigator) {
