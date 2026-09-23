@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="note-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e0f2fe" />
+    </linearGradient>
+  </defs>
+  <!-- Background with slight rounded corners for maskable icons -->
+  <rect width="512" height="512" rx="112" fill="url(#bg-grad)" />
+  <!-- Sparkle Accent -->
+  <path d="M380 120 L390 145 L415 155 L390 165 L380 190 L370 165 L345 155 L370 145 Z" fill="#bae6fd" opacity="0.9" />
+  <!-- Music Note Icon (Centered & Bold) -->
+  <path d="M210 380 C185 380 165 362 165 340 C165 318 185 300 210 300 C228 300 243 310 248 325 L248 180 C248 168 258 158 270 160 L345 172 C354 174 360 182 360 191 L360 225 C360 237 348 245 336 243 L280 234 L280 340 C280 362 260 380 235 380 Z" fill="url(#note-grad)" />
+</svg>

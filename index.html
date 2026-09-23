@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Now Playing AI Companion</title>
+  
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#ffffff">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body {
+      font-family: 'Google Sans Text', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .prose-music h3 {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #1f1f1f;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-left: 3px solid #0284c7;
+      padding-left: 0.5rem;
+      letter-spacing: -0.01em;
+    }
+    .prose-music h3:first-child {
+      margin-top: 0.5rem;
+    }
+    .dark .prose-music h3 {
+      color: #e3e3e3;
+    }
+
+    .prose-music p {
+      color: #1f1f1f;
+      font-size: 0.9375rem;
+      line-height: 1.85;
+      margin-top: 0;
+      margin-bottom: 0;
+      text-indent: 1em;
+      letter-spacing: 0.01em;
+    }
+    .dark .prose-music p {
+      color: #c4c7c5;
+    }
+    .prose-music strong, .prose-music b {
+      font-weight: 700;
+      color: #0b57d0;
+    }
+    .dark .prose-music strong, .dark .prose-music b {
+      color: #a8c7fa;
+    }
+  </style>
+</head>
+<body class="bg-white dark:bg-slate-900 text-[#1f1f1f] dark:text-[#e3e3e3] min-h-screen flex flex-col selection:bg-sky-500/20">
+
+  <header class="border-b border-slate-200/70 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-5 py-2.5 flex items-center justify-between">
+    <div id="btn-brand-settings" class="flex items-center gap-2 cursor-pointer select-none group" title="Gemini API設定">
+      <div class="h-6 w-6 rounded-md bg-sky-600 flex items-center justify-center text-white shadow-sm group-hover:bg-sky-500 transition">
+        <i data-lucide="music-2" class="h-3.5 w-3.5"></i>
+      </div>
+      <span class="font-bold text-xs tracking-tight text-slate-700 dark:text-slate-300">Now Playing</span>
+      <span id="api-key-indicator-dot" class="w-1.5 h-1.5 rounded-full bg-amber-500 hidden" title="APIキー未設定"></span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- ワンクリック 曲情報 共有/コピーボタン -->
+      <button id="btn-copy-track-header" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-xs font-medium transition shadow-sm" title="曲情報を共有またはコピー">
+        <i data-lucide="share-2" class="h-3.5 w-3.5 text-slate-600 dark:text-slate-300"></i>
+        <span id="btn-copy-track-text">曲情報</span>
+      </button>
+
+      <!-- 表示切り替えボタン（ミニマム / 標準） -->
+      <button id="btn-toggle-compact" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-xs font-medium transition shadow-sm">
+        <i data-lucide="minimize-2" class="h-3.5 w-3.5 text-sky-600"></i>
+        <span>ミニマム</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ミニマム表示 -->
+  <main id="compact-view" class="flex-1 max-w-2xl w-full mx-auto px-6 py-8 flex flex-col gap-6 bg-white dark:bg-slate-900 hidden">
+    <div class="flex flex-col sm:flex-row items-center sm:items-end gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
+      <div class="w-40 h-40 flex-shrink-0 bg-slate-50 dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center relative overflow-hidden">
+        <img id="compact-artwork-img" src="" alt="Artwork" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden">
+        <div id="compact-artwork-fallback" class="text-slate-400 flex flex-col items-center">
+          <i data-lucide="disc-3" class="h-10 w-10 mb-1 opacity-40"></i>
+          <span class="text-[11px] font-mono">No Image</span>
+        </div>
+      </div>
+
+      <div class="text-center sm:text-left flex-1 min-w-0">
+        <div class="mb-1 min-h-[22px] flex items-center gap-2">
+          <span id="compact-mode-badge" class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hidden">
+            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+            アルバムモード
+          </span>
+          <span id="compact-session-badge" class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hidden">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            自動追従中
+          </span>
+        </div>
+        <h2 id="compact-title" class="text-xl md:text-2xl font-bold text-[#1f1f1f] dark:text-white tracking-tight leading-tight break-words">待機中</h2>
+        <p id="compact-artist" class="text-xs font-medium text-slate-600 dark:text-slate-300 mt-1.5">音楽を再生してください</p>
+        <p id="compact-album" class="text-xs text-slate-400 dark:text-slate-500 mt-0.5"></p>
+      </div>
+    </div>
+
+    <div>
+      <!-- ミニマム セッションコントロールパネル -->
+      <div class="flex items-center justify-between gap-2 pb-4 mb-2 border-b border-slate-100 dark:border-slate-800">
+        <div class="flex items-center gap-2">
+          <button id="compact-btn-start-session" class="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+            <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
+            <span>ライナーノーツ開始</span>
+          </button>
+          <button id="compact-btn-stop-session" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold shadow-sm transition hidden flex items-center gap-1.5">
+            <i data-lucide="square" class="h-3 w-3 fill-current"></i>
+            <span>これでおしまい</span>
+          </button>
+        </div>
+        <button id="compact-btn-copy-notes" class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition flex items-center gap-1 hidden">
+          <i data-lucide="share-2" class="h-3.5 w-3.5"></i>
+          <span>解説を共有</span>
+        </button>
+      </div>
+
+      <div id="compact-loading" class="py-12 flex flex-col items-center justify-center gap-3 hidden">
+        <div class="w-5 h-5 rounded-full border-2 border-slate-300 border-t-sky-600 animate-spin"></div>
+        <p id="compact-loading-text" class="text-xs text-slate-400 tracking-wider">ライナーノーツを生成中...</p>
+      </div>
+
+      <div id="compact-placeholder" class="py-12 text-center text-xs text-slate-400">
+        「ライナーノーツ開始」を押すと、本格的な解説セッションが始まります（自動追従）。
+      </div>
+
+      <div id="compact-content" class="hidden space-y-6">
+        <div id="compact-markdown" class="prose-music text-[#1f1f1f] dark:text-[#e3e3e3] leading-relaxed font-normal"></div>
+        <div id="compact-qa-history" class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800 hidden"></div>
+      </div>
+    </div>
+
+    <div id="compact-qa-box" class="pt-2">
+      <div class="flex flex-wrap gap-1.5 mb-2.5">
+        <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="アーティストの経歴や音楽的ルーツ、バイオグラフィを教えて">👤 プロフィール</button>
+        <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="この楽曲のコード進行やアレンジの特徴を教えて">🎼 コード進行</button>
+        <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="この演奏・録音ならではの聴きどころは？">🎻 演奏の聴きどころ</button>
+        <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="参加ミュージシャンや録音エピソードを教えて">🎙 制作裏話</button>
+      </div>
+      <form id="compact-qa-form" class="flex items-center gap-2">
+        <input type="text" id="compact-qa-input" placeholder="曲やアルバムについてGeminiに質問..." class="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-sky-500 shadow-sm">
+        <button type="submit" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition">質問</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- 標準表示 -->
+  <main id="standard-view" class="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <!-- 左ペイン: プレイヤー -->
+    <div class="lg:col-span-5 flex flex-col gap-4">
+      <div class="rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <span id="source-app-name" class="text-xs font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Windows 監視中
+          </span>
+          <div class="flex items-center gap-2">
+            <span id="standard-mode-badge" class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800 hidden">
+              <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+              アルバムモード
+            </span>
+            <span id="standard-session-badge" class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800 hidden">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              自動追従中
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-center my-3">
+          <div class="relative w-44 h-44 bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center shadow-sm overflow-hidden">
+            <img id="artwork-img" src="" alt="Album Artwork" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden">
+            <div id="artwork-fallback" class="flex flex-col items-center p-3 text-center">
+              <i data-lucide="disc-3" class="h-12 w-12 text-slate-400 mb-1 opacity-30"></i>
+              <span id="album-display" class="text-xs text-slate-400 line-clamp-2 font-mono">待機中</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center mt-3">
+          <h2 id="track-title" class="text-base font-bold text-[#1f1f1f] dark:text-white line-clamp-1 tracking-tight">再生を待機しています</h2>
+          <p id="track-artist" class="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1 line-clamp-1"></p>
+          <p id="track-album-sub" class="text-xs text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1 hidden font-mono"></p>
+        </div>
+
+        <div class="mt-5 pt-4 border-t border-slate-100 dark:border-slate-750 flex flex-col gap-3">
+          <div class="flex items-center justify-center gap-5">
+            <button id="btn-prev-track" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 transition"><i data-lucide="skip-back" class="h-4 w-4"></i></button>
+            <button id="btn-play-pause" class="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center shadow-sm transition">
+              <i id="icon-play-pause" data-lucide="play" class="h-4 w-4 fill-current ml-0.5"></i>
+            </button>
+            <button id="btn-next-track" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 transition"><i data-lucide="skip-forward" class="h-4 w-4"></i></button>
+          </div>
+          <div class="flex items-center gap-2 px-2 mt-1">
+            <i data-lucide="volume-2" class="h-3.5 w-3.5 text-slate-400"></i>
+            <input type="range" id="volume-slider" min="0" max="100" value="50" class="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded appearance-none accent-sky-600">
+            <span id="volume-label" class="text-[11px] font-mono w-7 text-right text-slate-400">50%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右ペイン: インサイト & セッション -->
+    <div class="lg:col-span-7 flex flex-col gap-4">
+      <div class="rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm min-h-[480px] flex flex-col justify-between">
+        <div>
+          <!-- ヘッダーバー -->
+          <div class="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-750 mb-5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                <i data-lucide="sparkles" class="h-3.5 w-3.5 text-sky-600"></i>
+                ライナーノーツ
+              </span>
+              <span id="analysis-status-text" class="text-[11px] font-mono text-slate-400">停止中</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button id="btn-copy-notes" class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200/80 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition flex items-center gap-1 hidden shadow-sm">
+                <i data-lucide="share-2" class="h-3.5 w-3.5"></i>
+                <span id="btn-copy-notes-text">解説を共有</span>
+              </button>
+
+              <button id="btn-start-session" class="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
+                <span>ライナーノーツ開始</span>
+              </button>
+              <button id="btn-stop-session" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold shadow-sm transition hidden flex items-center gap-1.5">
+                <i data-lucide="square" class="h-3 w-3 fill-current"></i>
+                <span>これでおしまい</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 生成ローディング -->
+          <div id="ai-loading" class="py-16 flex flex-col items-center justify-center gap-3 hidden">
+            <div class="w-5 h-5 rounded-full border-2 border-slate-300 border-t-sky-600 animate-spin"></div>
+            <p id="standard-loading-text" class="text-xs text-slate-400 tracking-wider">ライナーノーツを生成中...</p>
+          </div>
+
+          <!-- 未開始時の洗練されたプレースホルダー（ミニマム表示のトーンに準拠） -->
+          <div id="ai-placeholder" class="py-8 px-4 flex flex-col items-center justify-center text-center">
+            <div class="w-11 h-11 rounded-2xl bg-sky-50 dark:bg-sky-950/50 border border-sky-100 dark:border-sky-900 flex items-center justify-center text-sky-600 dark:text-sky-400 mb-3 shadow-xs">
+              <i data-lucide="book-open" class="h-5 w-5"></i>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">AI 音楽ライナーノーツ</h3>
+            <p class="text-xs text-slate-400 dark:text-slate-500 max-w-sm mt-1.5 leading-relaxed">
+              「ライナーノーツ開始」を押すと、再生中の楽曲・アルバムに合わせた本格的な解説セッションが始まります（自動追従・離席時自動停止）。
+            </p>
+            <div class="mt-5 p-3 rounded-xl bg-slate-50 dark:bg-slate-850/70 border border-slate-200/60 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2 max-w-md">
+              <i data-lucide="info" class="h-4 w-4 text-sky-600 flex-shrink-0"></i>
+              <span>解説を生成しなくても、下部のクイック質問からプロフィールやコード進行などをピンポイント（省トークン）で確認できます。</span>
+            </div>
+          </div>
+
+          <!-- ライナーノーツ本文 & 回答履歴 -->
+          <div id="ai-content-body" class="space-y-4 hidden">
+            <div id="markdown-output" class="prose-music text-[#1f1f1f] dark:text-[#e3e3e3] leading-relaxed font-normal"></div>
+            <div id="standard-qa-history" class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-750 hidden"></div>
+          </div>
+        </div>
+
+        <!-- QAフッターエリア -->
+        <div id="standard-qa-box" class="pt-4 border-t border-slate-100 dark:border-slate-750 mt-6">
+          <div class="flex flex-wrap gap-1.5 mb-2.5">
+            <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="アーティストの経歴や音楽的ルーツ、バイオグラフィを教えて">👤 プロフィール</button>
+            <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="この楽曲のコード進行やアレンジの特徴を教えて">🎼 コード進行</button>
+            <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="この演奏・録音ならではの聴きどころは？">🎻 演奏の聴きどころ</button>
+            <button class="qa-quick-chip px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-[11px] text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 transition" data-q="参加ミュージシャンや録音エピソードを教えて">🎙 制作裏話</button>
+          </div>
+          <form id="standard-qa-form" class="flex items-center gap-2">
+            <input type="text" id="standard-qa-input" placeholder="曲やアルバムについてGeminiに何でも質問..." class="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-sky-500 shadow-sm">
+            <button type="submit" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition">送信</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 設定モーダル -->
+  <div id="api-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-xl">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-bold text-sm">Gemini API 設定</h3>
+        <button id="btn-close-api-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="h-4 w-4"></i></button>
+      </div>
+      <input type="password" id="input-api-key" placeholder="AIzaSy..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-3.5 py-2 text-xs mb-4 focus:outline-none focus:border-sky-500">
+      <div class="flex justify-end">
+        <button id="btn-save-api-key" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      apiKey: localStorage.getItem('gemini_api_key') || '',
+      isCompact: localStorage.getItem('view_mode_compact') === 'true',
+      currentTrack: { 
+        title: '', 
+        artist: '', 
+        album: '', 
+        parsedArtist: '', 
+        parsedAlbum: '', 
+        app: '', 
+        playing: false, 
+        hasArtwork: false, 
+        artworkSeq: 0 
+      },
+      isAnalyzing: false,
+      latestInsightText: '',
+      chatHistory: [],
+      trackGenerationId: 0,
+      
+      // セッション＆追従管理
+      isSessionActive: false, // ユーザーが開始を押すまで完全停止（0円）
+      activeAlbumKey: '',
+      consecutiveCount: 0,
+      isAlbumMode: false,
+      
+      // メモリ専用キャッシュ（ディスク保存ゼロ、離脱時即破棄）
+      albumMemoryCache: {
+        albumKey: '',
+        commonInsight: ''
+      }
+    };
+
+    let isUserDraggingSlider = false;
+    let lockDetectionTimer = null;
+
+    // UI要素の取得
+    const elStandardView = document.getElementById('standard-view');
+    const elCompactView = document.getElementById('compact-view');
+    const elBtnToggleCompact = document.getElementById('btn-toggle-compact');
+    const elCompactArtworkImg = document.getElementById('compact-artwork-img');
+    const elCompactArtworkFallback = document.getElementById('compact-artwork-fallback');
+    const elCompactTitle = document.getElementById('compact-title');
+    const elCompactArtist = document.getElementById('compact-artist');
+    const elCompactAlbum = document.getElementById('compact-album');
+    const elCompactLoading = document.getElementById('compact-loading');
+    const elCompactLoadingText = document.getElementById('compact-loading-text');
+    const elCompactPlaceholder = document.getElementById('compact-placeholder');
+    const elCompactContent = document.getElementById('compact-content');
+    const elCompactMarkdown = document.getElementById('compact-markdown');
+    const elCompactQaHistory = document.getElementById('compact-qa-history');
+    const elCompactQaForm = document.getElementById('compact-qa-form');
+    const elCompactQaInput = document.getElementById('compact-qa-input');
+    const elCompactModeBadge = document.getElementById('compact-mode-badge');
+    const elCompactSessionBadge = document.getElementById('compact-session-badge');
+    const elCompactBtnStartSession = document.getElementById('compact-btn-start-session');
+    const elCompactBtnStopSession = document.getElementById('compact-btn-stop-session');
+    const elCompactBtnCopyNotes = document.getElementById('compact-btn-copy-notes');
+
+    const elArtworkImg = document.getElementById('artwork-img');
+    const elArtworkFallback = document.getElementById('artwork-fallback');
+    const elTrackTitle = document.getElementById('track-title');
+    const elTrackArtist = document.getElementById('track-artist');
+    const elTrackAlbumSub = document.getElementById('track-album-sub');
+    const elAlbumDisplay = document.getElementById('album-display');
+    const elAiPlaceholder = document.getElementById('ai-placeholder');
+    const elAiLoading = document.getElementById('ai-loading');
+    const elStandardLoadingText = document.getElementById('standard-loading-text');
+    const elAiContentBody = document.getElementById('ai-content-body');
+    const elMarkdownOutput = document.getElementById('markdown-output');
+    const elStandardQaHistory = document.getElementById('standard-qa-history');
+    const elStandardQaForm = document.getElementById('standard-qa-form');
+    const elStandardQaInput = document.getElementById('standard-qa-input');
+    const elAnalysisStatusText = document.getElementById('analysis-status-text');
+    const elStandardModeBadge = document.getElementById('standard-mode-badge');
+    const elStandardSessionBadge = document.getElementById('standard-session-badge');
+    const elBtnStartSession = document.getElementById('btn-start-session');
+    const elBtnStopSession = document.getElementById('btn-stop-session');
+    const elBtnCopyNotes = document.getElementById('btn-copy-notes');
+    const elBtnCopyNotesText = document.getElementById('btn-copy-notes-text');
+    const elBtnCopyTrackHeader = document.getElementById('btn-copy-track-header');
+    const elBtnCopyTrackText = document.getElementById('btn-copy-track-text');
+
+    const elBtnPrev = document.getElementById('btn-prev-track');
+    const elBtnPlayPause = document.getElementById('btn-play-pause');
+    const elVolumeSlider = document.getElementById('volume-slider');
+    const elVolumeLabel = document.getElementById('volume-label');
+    const elBtnNext = document.getElementById('btn-next-track');
+
+    const elApiModal = document.getElementById('api-modal');
+    const elBtnBrandSettings = document.getElementById('btn-brand-settings');
+    const elBtnCloseApiModal = document.getElementById('btn-close-api-modal');
+    const elBtnSaveApiKey = document.getElementById('btn-save-api-key');
+    const elInputApiKey = document.getElementById('input-api-key');
+    const elApiKeyDot = document.getElementById('api-key-indicator-dot');
+
+    function safeCreateIcons() { try { lucide.createIcons(); } catch(e) {} }
+
+    function updatePlayPauseIcon(isPlaying) {
+      if (isPlaying) {
+        elBtnPlayPause.innerHTML = '<i data-lucide="pause" class="h-5 w-5 fill-current"></i>';
+      } else {
+        elBtnPlayPause.innerHTML = '<i data-lucide="play" class="h-5 w-5 fill-current ml-0.5"></i>';
+      }
+      safeCreateIcons();
+    }
+
+    function renderCleanMarkdown(rawMarkdown) {
+      if (!rawMarkdown) return '';
+      let text = rawMarkdown.replace(/\*\*\s*([^\*\n]+?)\s*\*\*/g, '<strong>$1</strong>');
+      let html = marked.parse(text);
+      return html.replace(/\*\*/g, '');
+    }
+
+    // クリップボード用のMarkdown正規化（各セクション見出しの前後に必ず空行を挿入）
+    function formatMarkdownForClipboard(rawText) {
+      if (!rawText) return '';
+      let text = rawText.trim();
+      
+      // 見出し行（### 見出し）の前に空行がない場合は挿入
+      text = text.replace(/([^\n])\n(#{1,6}\s+[^\n]+)/g, '$1\n\n$2');
+      
+      // 見出し行の直後に空行がない場合は挿入
+      text = text.replace(/(#{1,6}\s+[^\n]+)\n([^\n#])/g, '$1\n\n$2');
+      
+      // 3つ以上の連続改行は2つ（標準の1空行）に正規化
+      text = text.replace(/\n{3,}/g, '\n\n');
+      
+      return text;
+    }
+
+    function normalizeKey(str) {
+      return (str || '').trim().toLowerCase().replace(/[\s\u3000\-_—]/g, '');
+    }
+
+    function parseArtistAndAlbum(rawArtist, rawAlbum) {
+      let artist = (rawArtist || '').trim();
+      let album = (rawAlbum || '').trim();
+
+      if (!album && (artist.includes('—') || artist.includes(' - '))) {
+        const parts = artist.includes('—') ? artist.split('—') : artist.split(' - ');
+        if (parts.length >= 2) {
+          artist = parts[0].trim();
+          album = parts.slice(1).join('—').trim();
+        }
+      }
+      return { artist, album };
+    }
+
+    // セッション表示・バッジ制御
+    function updateSessionUI() {
+      if (state.isSessionActive) {
+        elBtnStartSession.classList.add('hidden');
+        elBtnStopSession.classList.remove('hidden');
+        elCompactBtnStartSession.classList.add('hidden');
+        elCompactBtnStopSession.classList.remove('hidden');
+        elStandardSessionBadge.classList.remove('hidden');
+        elCompactSessionBadge.classList.remove('hidden');
+      } else {
+        elBtnStartSession.classList.remove('hidden');
+        elBtnStopSession.classList.add('hidden');
+        elCompactBtnStartSession.classList.remove('hidden');
+        elCompactBtnStopSession.classList.add('hidden');
+        elStandardSessionBadge.classList.add('hidden');
+        elCompactSessionBadge.classList.add('hidden');
+        elAnalysisStatusText.textContent = '停止中';
+      }
+      safeCreateIcons();
+    }
+
+    function updateModeBadges() {
+      if (state.isAlbumMode) {
+        elCompactModeBadge.classList.remove('hidden');
+        elStandardModeBadge.classList.remove('hidden');
+      } else {
+        elCompactModeBadge.classList.add('hidden');
+        elStandardModeBadge.classList.add('hidden');
+      }
+    }
+
+    function evaluateContinuity(parsedArtist, parsedAlbum) {
+      const rawKey = parsedAlbum ? `${parsedArtist}:::${parsedAlbum}` : parsedArtist;
+      const currentKey = normalizeKey(rawKey);
+
+      if (!currentKey) return;
+
+      if (currentKey === state.activeAlbumKey) {
+        state.consecutiveCount += 1;
+      } else {
+        state.activeAlbumKey = currentKey;
+        state.consecutiveCount = 1;
+
+        // アルバムが変わったらメモリキャッシュを即座に破棄（クリーンアップ）
+        if (state.albumMemoryCache.albumKey !== currentKey) {
+          state.albumMemoryCache.albumKey = '';
+          state.albumMemoryCache.commonInsight = '';
+        }
+      }
+
+      state.isAlbumMode = (state.consecutiveCount >= 3);
+      updateModeBadges();
+    }
+
+    // アートワーク描画
+    function renderArtwork(hasArtwork, seq) {
+      if (hasArtwork && seq > 0) {
+        const url = `/api/artwork?seq=${seq}&t=${Date.now()}`;
+        elArtworkImg.onload = () => {
+          elArtworkImg.classList.remove('hidden');
+          elArtworkFallback.classList.add('hidden');
+        };
+        elCompactArtworkImg.onload = () => {
+          elCompactArtworkImg.classList.remove('hidden');
+          elCompactArtworkFallback.classList.add('hidden');
+        };
+        elArtworkImg.src = url;
+        elCompactArtworkImg.src = url;
+      } else {
+        elArtworkImg.classList.add('hidden');
+        elArtworkFallback.classList.remove('hidden');
+        elCompactArtworkImg.classList.add('hidden');
+        elCompactArtworkFallback.classList.remove('hidden');
+      }
+    }
+
+    elArtworkImg.onerror = () => {
+      elArtworkImg.classList.add('hidden');
+      elArtworkFallback.classList.remove('hidden');
+    };
+    elCompactArtworkImg.onerror = () => {
+      elCompactArtworkImg.classList.add('hidden');
+      elCompactArtworkFallback.classList.remove('hidden');
+    };
+
+    function applyViewMode() {
+      if (state.isCompact) {
+        elStandardView.classList.add('hidden');
+        elCompactView.classList.remove('hidden');
+        elBtnToggleCompact.innerHTML = '<i data-lucide="maximize-2" class="h-3.5 w-3.5 text-sky-600"></i><span>標準</span>';
+      } else {
+        elCompactView.classList.add('hidden');
+        elStandardView.classList.remove('hidden');
+        elBtnToggleCompact.innerHTML = '<i data-lucide="minimize-2" class="h-3.5 w-3.5 text-sky-600"></i><span>ミニマム</span>';
+      }
+      safeCreateIcons();
+    }
+
+    elBtnToggleCompact.addEventListener('click', () => {
+      state.isCompact = !state.isCompact;
+      localStorage.setItem('view_mode_compact', state.isCompact);
+      applyViewMode();
+    });
+
+    // 汎用: Web Share API または クリップボードコピーのハイブリッド共有
+    async function shareOrCopyText({ title, text, btnElement, textElement, originalLabel }) {
+      if (!text) return;
+
+      // 1. AndroidやWindowsのOS標準 共有シートが利用可能な場合
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: title || 'Now Playing',
+            text: text
+          });
+          return; // 共有成功
+        } catch (err) {
+          if (err.name === 'AbortError') return; // ユーザーがキャンセルした場合は何もしない
+          // 共有失敗時は下のクリップボードフォールバックへ
+        }
+      }
+
+      // 2. 共有非対応、または失敗時のクリップボードコピー
+      try {
+        await navigator.clipboard.writeText(text);
+        if (textElement) {
+          textElement.textContent = '完了!';
+          setTimeout(() => {
+            textElement.textContent = originalLabel;
+          }, 1500);
+        }
+      } catch (err) {
+        console.error('共有・コピー失敗:', err);
+      }
+    }
+
+    // 1. ワンクリック「曲情報」の共有
+    async function handleShareTrackInfo() {
+      if (!state.currentTrack.title) return;
+      const title = state.currentTrack.title;
+      const artist = state.currentTrack.parsedArtist || state.currentTrack.artist;
+      const album = state.currentTrack.parsedAlbum || state.currentTrack.album;
+
+      const formatted = album ? `${title} / ${artist} - 『${album}』` : `${title} / ${artist}`;
+
+      await shareOrCopyText({
+        title: `${title} - ${artist}`,
+        text: formatted,
+        textElement: elBtnCopyTrackText,
+        originalLabel: '曲情報'
+      });
+    }
+    elBtnCopyTrackHeader.addEventListener('click', handleShareTrackInfo);
+
+    // 2. ワンクリック「ライナーノーツ」の共有
+    async function handleShareLinerNotes(isCompact = false) {
+      if (!state.latestInsightText) return;
+      const title = state.currentTrack.title;
+      const artist = state.currentTrack.parsedArtist || state.currentTrack.artist;
+      const album = state.currentTrack.parsedAlbum || state.currentTrack.album;
+
+      const metaHeader = `## ${title} / ${artist}${album ? ` (アルバム: ${album})` : ''}\n\n`;
+      const formattedBody = formatMarkdownForClipboard(state.latestInsightText);
+      const fullText = metaHeader + formattedBody;
+
+      const labelEl = isCompact ? elCompactBtnCopyNotes.querySelector('span') : elBtnCopyNotesText;
+      const originalText = isCompact ? '解説を共有' : '解説を共有';
+
+      await shareOrCopyText({
+        title: `ライナーノーツ: ${title} / ${artist}`,
+        text: fullText,
+        textElement: labelEl,
+        originalLabel: originalText
+      });
+    }
+    elBtnCopyNotes.addEventListener('click', () => handleShareLinerNotes(false));
+    elCompactBtnCopyNotes.addEventListener('click', () => handleShareLinerNotes(true));
+
+    // 3. セッション管理（開始 / おしまい）
+    function startSession() {
+      state.isSessionActive = true;
+      updateSessionUI();
+      if (state.currentTrack.title) {
+        triggerGeminiAnalysis(state.trackGenerationId);
+      }
+    }
+
+    function stopSession() {
+      state.isSessionActive = false;
+      state.isAnalyzing = false;
+      state.latestInsightText = '';
+      
+      // メモリキャッシュも破棄
+      state.albumMemoryCache.albumKey = '';
+      state.albumMemoryCache.commonInsight = '';
+
+      // 表示中のライナーノーツ本文とコピーボタンを非表示化・クリア
+      elMarkdownOutput.innerHTML = '';
+      elCompactMarkdown.innerHTML = '';
+      elAiContentBody.classList.add('hidden');
+      elCompactContent.classList.add('hidden');
+      elBtnCopyNotes.classList.add('hidden');
+      elCompactBtnCopyNotes.classList.add('hidden');
+
+      // 初期の案内プレースホルダーを再表示
+      elAiPlaceholder.classList.remove('hidden');
+      elCompactPlaceholder.classList.remove('hidden');
+
+      // QA履歴もクリア
+      state.chatHistory = [];
+      renderQaHistory();
+
+      updateSessionUI();
+      elAiLoading.classList.add('hidden');
+      elCompactLoading.classList.add('hidden');
+    }
+
+    elBtnStartSession.addEventListener('click', startSession);
+    elCompactBtnStartSession.addEventListener('click', startSession);
+    elBtnStopSession.addEventListener('click', stopSession);
+    elCompactBtnStopSession.addEventListener('click', stopSession);
+
+    // 4. 安全弁：Windows画面ロック・離席センサー（画面消灯）検知
+    // 画面が非表示になって1分経過したら、自動でセッションを終了（0円防御）
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (state.isSessionActive) {
+          lockDetectionTimer = setTimeout(() => {
+            console.log('離席・画面消灯を検知：ライナーノーツセッションを安全停止しました。');
+            stopSession();
+          }, 60000); // 1分後に完全シャットダウン
+        }
+      } else {
+        if (lockDetectionTimer) {
+          clearTimeout(lockDetectionTimer);
+          lockDetectionTimer = null;
+        }
+      }
+    });
+
+    applyViewMode();
+    updateApiKeyStatus();
+    updateModeBadges();
+    updateSessionUI();
+
+    // メディア制御
+    async function sendControl(action, value = null) {
+      try {
+        await fetch('/api/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, value })
+        });
+        setTimeout(pollSmtcBridge, 150);
+        setTimeout(pollSmtcBridge, 500);
+      } catch (e) {}
+    }
+
+    elBtnPlayPause.addEventListener('click', () => {
+      const nextStatus = !state.currentTrack.playing;
+      state.currentTrack.playing = nextStatus;
+      updatePlayPauseIcon(nextStatus);
+      sendControl('play_pause');
+    });
+
+    elBtnPrev.addEventListener('click', () => sendControl('previous'));
+    elBtnNext.addEventListener('click', () => sendControl('next'));
+
+    elVolumeSlider.addEventListener('mousedown', () => { isUserDraggingSlider = true; });
+    elVolumeSlider.addEventListener('mouseup', () => { isUserDraggingSlider = false; });
+    elVolumeSlider.addEventListener('input', (e) => {
+      elVolumeLabel.textContent = `${e.target.value}%`;
+      sendControl('set_volume', e.target.value);
+    });
+
+    // Androidの共有テキストから曲名とアーティストを解析する関数
+    function parseSharedTrackText(rawText, rawTitle) {
+      let combined = (rawText || '') + ' ' + (rawTitle || '');
+      // URLを除去
+      combined = combined.replace(/https?:\/\/\S+/gi, '').trim();
+
+      let title = '';
+      let artist = '';
+      let album = '';
+
+      // 一般的な区切りパターンを解析
+      if (combined.includes(' - ')) {
+        const parts = combined.split(' - ');
+        artist = parts[0].trim();
+        title = parts.slice(1).join(' - ').trim();
+      } else if (combined.includes(' / ')) {
+        const parts = combined.split(' / ');
+        title = parts[0].trim();
+        artist = parts.slice(1).join(' / ').trim();
+      } else if (combined.toLowerCase().includes(' by ')) {
+        const parts = combined.split(/ by /i);
+        title = parts[0].trim();
+        artist = parts.slice(1).join(' by ').trim();
+      } else {
+        title = combined;
+        artist = 'アーティスト不明';
+      }
+
+      // 引用符や装飾をトリミング
+      title = title.replace(/^["'『「]+|["'』」]+$/g, '').trim();
+      artist = artist.replace(/^["'『「]+|["'』」]+$/g, '').trim();
+
+      return { title, artist, album };
+    }
+
+    // AndroidのWeb Share Target（URLパラメータ）からの起動を検知
+    function checkIncomingShare() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sharedTitle = urlParams.get('title') || '';
+      const sharedText = urlParams.get('text') || '';
+      const sharedUrl = urlParams.get('url') || '';
+
+      if (sharedTitle || sharedText || sharedUrl) {
+        const parsed = parseSharedTrackText(sharedText, sharedTitle);
+        if (parsed.title) {
+          handleIncomingTrack({
+            title: parsed.title,
+            artist: parsed.artist,
+            album: parsed.album,
+            playing: true,
+            has_artwork: false,
+            artwork_seq: 0
+          });
+          // 共有されたらすぐに読めるよう自動でセッション開始
+          startSession();
+        }
+      }
+    }
+
+    async function pollSmtcBridge() {
+      // 共有パラメータから開かれた場合はWindowsサーバーへのポーリングをスキップ
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('title') || urlParams.get('text')) return;
+
+      try {
+        const res = await fetch('/api/track');
+        if (res.ok) {
+          const data = await res.json();
+          handleIncomingTrack(data);
+        }
+      } catch (e) {}
+    }
+    setInterval(pollSmtcBridge, 1000);
+
+    // 起動時にAndroid共有パラメータをチェック
+    checkIncomingShare();
+
+    function handleIncomingTrack(data) {
+      if (!data) return;
+
+      if (data.volume !== undefined && !isUserDraggingSlider) {
+        elVolumeSlider.value = data.volume;
+        elVolumeLabel.textContent = `${data.volume}%`;
+      }
+
+      if (data.playing !== undefined && data.playing !== state.currentTrack.playing) {
+        state.currentTrack.playing = data.playing;
+        updatePlayPauseIcon(data.playing);
+      }
+
+      const trackTitle = (data.title || '').trim();
+      const rawArtist = (data.artist || '').trim();
+      const rawAlbum = (data.album || '').trim();
+      if (!trackTitle) return;
+
+      const trackKey = `${trackTitle}:::${rawArtist}`;
+
+      if (trackKey !== `${state.currentTrack.title}:::${state.currentTrack.artist}`) {
+        state.trackGenerationId++;
+        const currentGenId = state.trackGenerationId;
+
+        const { artist, album } = parseArtistAndAlbum(rawArtist, rawAlbum);
+
+        state.currentTrack.title = trackTitle;
+        state.currentTrack.artist = rawArtist;
+        state.currentTrack.album = rawAlbum;
+        state.currentTrack.parsedArtist = artist;
+        state.currentTrack.parsedAlbum = album;
+
+        elTrackTitle.textContent = trackTitle;
+        elTrackArtist.textContent = artist;
+        if (album) {
+          elTrackAlbumSub.textContent = album;
+          elTrackAlbumSub.classList.remove('hidden');
+          elAlbumDisplay.textContent = album;
+        } else {
+          elTrackAlbumSub.classList.add('hidden');
+          elAlbumDisplay.textContent = artist;
+        }
+
+        elCompactTitle.textContent = trackTitle;
+        elCompactArtist.textContent = artist;
+        elCompactAlbum.textContent = album ? album : '';
+
+        // ジャケット描画
+        if (data.has_artwork && data.artwork_seq > 0) {
+          state.currentTrack.hasArtwork = true;
+          state.currentTrack.artworkSeq = data.artwork_seq;
+          renderArtwork(true, data.artwork_seq);
+        } else {
+          state.currentTrack.hasArtwork = false;
+          state.currentTrack.artworkSeq = 0;
+          renderArtwork(false, 0);
+        }
+
+        state.chatHistory = [];
+        renderQaHistory();
+
+        // アルバム連続性の判定
+        evaluateContinuity(state.currentTrack.parsedArtist, state.currentTrack.parsedAlbum);
+
+        // ★重要：セッションがONの時だけ自動追従（OFFの時は完全停止で0円）
+        if (state.isSessionActive) {
+          triggerGeminiAnalysis(currentGenId);
+        }
+
+      } else {
+        if (data.has_artwork && data.artwork_seq > state.currentTrack.artworkSeq) {
+          state.currentTrack.hasArtwork = true;
+          state.currentTrack.artworkSeq = data.artwork_seq;
+          renderArtwork(true, data.artwork_seq);
+        }
+      }
+    }
+
+    async function triggerGeminiAnalysis(targetGenId) {
+      if (!state.currentTrack.title || state.isAnalyzing) return;
+      const apiKey = state.apiKey.trim();
+      if (!apiKey) {
+        elAiPlaceholder.classList.add('hidden');
+        elAiContentBody.classList.remove('hidden');
+        elCompactPlaceholder.classList.add('hidden');
+        elCompactContent.classList.remove('hidden');
+        const errHtml = '<div class="p-3 rounded-lg bg-amber-50 text-amber-700 text-xs">右上の歯車アイコンから Gemini API キーを設定してください。</div>';
+        elMarkdownOutput.innerHTML = errHtml;
+        elCompactMarkdown.innerHTML = errHtml;
+        return;
+      }
+
+      state.isAnalyzing = true;
+
+      elAiPlaceholder.classList.add('hidden');
+      elCompactPlaceholder.classList.add('hidden');
+      elAiContentBody.classList.add('hidden');
+      elCompactContent.classList.add('hidden');
+      elAiLoading.classList.remove('hidden');
+      elCompactLoading.classList.remove('hidden');
+      elBtnCopyNotes.classList.add('hidden');
+      elCompactBtnCopyNotes.classList.add('hidden');
+
+      elAnalysisStatusText.textContent = '解析中...';
+      elCompactLoadingText.textContent = state.isAlbumMode ? 'アルバムの世界観と楽曲を解析中...' : '楽曲・演奏・プロフィールを解析中...';
+      elStandardLoadingText.textContent = state.isAlbumMode ? 'アルバムライナーノーツを生成中...' : '解説を生成中...';
+
+      let prompt = '';
+      const artist = state.currentTrack.parsedArtist;
+      const album = state.currentTrack.parsedAlbum || artist;
+
+      if (state.isAlbumMode) {
+        prompt = `リスナーは現在、アルバム『${album}』の楽曲群を集中して楽しんでいます（再生順は問わず、作品の世界観を味わっています）。
+アーティスト: ${artist}
+アルバム名: ${album}
+現在再生中のトラック: ${state.currentTrack.title}
+
+アルバム全体の大局的な視点と、現在再生中の楽曲の魅力を両立させた本格的な音楽ライナーノーツを作成してください。
+
+絶対厳守の執筆ルール:
+1. 【前置き・挨拶の完全禁止】
+   前置き文は1文字も書かず、1行目からいきなり「### アルバム『${album}』の時代背景とコンセプト」で開始してください。
+2. 【見出しと構成（空行の徹底）】
+   頭から順番に聴いていること（曲順）を前提とせず、以下の3つの見出しで各パートをしっかり詳しく記述してください。
+   ★各見出し（###）の直前と直後には必ず空行を1行空けて、セクションを明確に区切ってください：
+
+   ### アルバム『${album}』の時代背景とコンセプト
+
+   ### 作品全体のサウンドメイキングと音楽的特徴
+
+   ### 本作における「${state.currentTrack.title}」の魅力と位置づけ
+
+3. 【事実の正確性とクレジットの徹底】
+   - アルバムのリリース年、プロデューサー、参加ミュージシャン、時代的背景を正確に記述してください。
+   - 3つ目のセクションでは、曲順の前後関係には触れず、このアルバムを彩る重要なピースとしての「${state.currentTrack.title}」の音楽的魅力、アレンジ、聴きどころを解説してください。
+4. 【太字強調のルール】
+   - アーティスト名、重要人名、年代表記（例: 1976年リリース）、コード進行、キーとなる音楽用語は太字（**単語**）で強調してください。`;
+      } else {
+        prompt = `現在再生中の以下の楽曲について、本格的な音楽ライナーノーツを作成してください。
+曲名: ${state.currentTrack.title}
+アーティスト: ${artist}
+アルバム: ${album || 'シングル / 不明'}
+
+絶対厳守の執筆ルール:
+1. 【前置き・挨拶の完全禁止】
+   前置き文は1文字も書かず、1行目からいきなり「### アーティストと楽曲の背景」で開始してください。
+2. 【見出しと構成（空行の徹底）】
+   必ず以下の3つの見出しを使用し、各パートをしっかり詳しく記述してください。
+   ★各見出し（###）の直前と直後には必ず空行を1行空けて、セクションを明確に区切ってください：
+
+   ### アーティストと楽曲の背景
+
+   ### 演奏・アンサンブルの特徴
+
+   ### 聴きどころと位置づけ
+
+3. 【事実の正確性とクレジットの徹底】
+   - 作詞・作曲・編曲者、リリース年、参加ミュージシャンなどの固有名詞は、曖昧な推測や他曲との混同を避け、正確な公式クレジットに基づいて記述してください。
+   - アーティストの出自・音楽的ルーツや特徴、キャリア全体における本作の重要性を詳しく紹介してください。
+   - 楽曲の初出リリース年（およびアルバム発売年）を必ず明記してください。洋楽の場合は原題と邦題を併記してください。
+4. 【太字強調のルール】
+   - アーティスト名、重要人名、年代表記（例: 1976年リリース）、コード進行、キーとなる音楽用語は太字（**単語**）で強調してください。`;
+      }
+
+      try {
+        const bodyObj = {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { 
+            temperature: 0.7,
+            maxOutputTokens: 4096,
+            thinkingConfig: {
+              thinkingBudget: 0
+            }
+          }
+        };
+
+        const model = 'gemini-3.6-flash';
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyObj)
+        });
+
+        if (targetGenId !== state.trackGenerationId) return;
+
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.error?.message || `HTTP ${res.status}`);
+        }
+
+        const resData = await res.json();
+        if (targetGenId !== state.trackGenerationId) return;
+
+        const text = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        state.latestInsightText = text;
+
+        const cleanHtml = renderCleanMarkdown(text);
+        elMarkdownOutput.innerHTML = cleanHtml;
+        elCompactMarkdown.innerHTML = cleanHtml;
+
+        elAiLoading.classList.add('hidden');
+        elCompactLoading.classList.add('hidden');
+        elAiContentBody.classList.remove('hidden');
+        elCompactContent.classList.remove('hidden');
+        elBtnCopyNotes.classList.remove('hidden');
+        elCompactBtnCopyNotes.classList.remove('hidden');
+        elAnalysisStatusText.textContent = state.isAlbumMode ? `完了 (アルバムモード)` : `完了 (${model})`;
+
+      } catch (err) {
+        if (targetGenId !== state.trackGenerationId) return;
+
+        const errHtml = `<div class="p-3 rounded-lg bg-rose-50 text-rose-600 text-xs">生成エラー: ${err.message}</div>`;
+        elMarkdownOutput.innerHTML = errHtml;
+        elCompactMarkdown.innerHTML = errHtml;
+        elAiLoading.classList.add('hidden');
+        elCompactLoading.classList.add('hidden');
+        elAiContentBody.classList.remove('hidden');
+        elCompactContent.classList.remove('hidden');
+        elAnalysisStatusText.textContent = 'エラー';
+      } finally {
+        if (targetGenId === state.trackGenerationId) {
+          state.isAnalyzing = false;
+        }
+      }
+    }
+
+    async function askGeminiQuestion(q) {
+      if (!q || !q.trim() || !state.apiKey) return;
+      const question = q.trim();
+
+      // セッション停止中であっても、質問時は回答枠を表示してプレースホルダーを隠す
+      elAiPlaceholder.classList.add('hidden');
+      elCompactPlaceholder.classList.add('hidden');
+      elAiContentBody.classList.remove('hidden');
+      elCompactContent.classList.remove('hidden');
+
+      state.chatHistory.push({ role: 'user', text: question });
+      renderQaHistory();
+
+      const loadingId = 'loading-' + Date.now();
+      state.chatHistory.push({ role: 'model', text: '...', id: loadingId, isLoading: true });
+      renderQaHistory();
+
+      const prompt = `現在再生中の情報:
+- 曲名: ${state.currentTrack.title}
+- アーティスト: ${state.currentTrack.parsedArtist}
+- アルバム: ${state.currentTrack.parsedAlbum}
+- モード: ${state.isAlbumMode ? 'アルバムモード' : '通常'}
+- 直前の解説文: ${state.latestInsightText || '（ライナーノーツ未生成）'}
+
+質問:
+${question}
+
+指示: 前置きの挨拶は省き、要点を分かりやすく回答してください。重要な言葉や年代・人名は太字にしてください。`;
+
+      try {
+        const bodyObj = {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { 
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+            thinkingConfig: {
+              thinkingBudget: 0
+            }
+          }
+        };
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${state.apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyObj)
+        });
+        const resData = await res.json();
+        const answer = resData.candidates?.[0]?.content?.parts?.[0]?.text || '回答が得られませんでした。';
+        const idx = state.chatHistory.findIndex(i => i.id === loadingId);
+        if (idx !== -1) state.chatHistory[idx] = { role: 'model', text: answer, rawMarkdown: answer, questionContext: question };
+      } catch (err) {
+        const idx = state.chatHistory.findIndex(i => i.id === loadingId);
+        if (idx !== -1) state.chatHistory[idx] = { role: 'model', text: `エラー: ${err.message}` };
+      } finally {
+        renderQaHistory();
+      }
+    }
+
+    async function copyQaAnswer(rawText, btnElement, questionContext = '') {
+      if (!rawText) return;
+      const title = state.currentTrack.title;
+      const artist = state.currentTrack.parsedArtist || state.currentTrack.artist;
+      const album = state.currentTrack.parsedAlbum || state.currentTrack.album;
+
+      const header = title ? `### ${questionContext ? `${questionContext} - ` : ''}${title} / ${artist}${album ? ` (アルバム: ${album})` : ''}\n\n` : '';
+      const formatted = formatMarkdownForClipboard(rawText);
+      const fullText = header + formatted;
+
+      const textSpan = btnElement.querySelector('.copy-label');
+      await shareOrCopyText({
+        title: `${questionContext || '音楽メモ'} - ${title} / ${artist}`,
+        text: fullText,
+        textElement: textSpan,
+        originalLabel: '共有'
+      });
+    }
+
+    function renderQaHistory() {
+      const render = (container) => {
+        if (!container) return;
+        if (state.chatHistory.length === 0) {
+          container.classList.add('hidden');
+          container.innerHTML = '';
+          return;
+        }
+        container.classList.remove('hidden');
+        container.innerHTML = state.chatHistory.map((item, index) => {
+          if (item.role === 'user') {
+            return `<div class="flex justify-end"><div class="bg-sky-600 text-white rounded-xl px-3.5 py-2 text-xs max-w-[85%] shadow-sm">${item.text}</div></div>`;
+          } else {
+            return `
+              <div class="flex flex-col items-start gap-1.5 max-w-[90%]">
+                <div class="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-3.5 py-2.5 text-xs leading-relaxed shadow-sm border border-slate-200/80 dark:border-slate-700/80 prose-music">
+                  ${item.isLoading ? '<span class="inline-flex items-center gap-1.5 text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>思考中...</span>' : renderCleanMarkdown(item.text)}
+                </div>
+                ${!item.isLoading && item.rawMarkdown ? `
+                  <button class="qa-copy-btn flex items-center gap-1 px-2 py-1 rounded-md bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-[11px] font-medium transition shadow-xs" data-qa-idx="${index}">
+                    <span class="copy-icon flex items-center"><i data-lucide="share-2" class="h-3 w-3 text-slate-500 dark:text-slate-400"></i></span>
+                    <span class="copy-label text-slate-600 dark:text-slate-300">共有</span>
+                  </button>
+                ` : ''}
+              </div>
+            `;
+          }
+        }).join('');
+
+        // 共有ボタンのイベントリスナーを設定
+        container.querySelectorAll('.qa-copy-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const idx = parseInt(btn.getAttribute('data-qa-idx'), 10);
+            const target = state.chatHistory[idx];
+            if (target && target.rawMarkdown) {
+              copyQaAnswer(target.rawMarkdown, btn, target.questionContext);
+            }
+          });
+        });
+      };
+
+      render(elStandardQaHistory);
+      render(elCompactQaHistory);
+      safeCreateIcons();
+    }
+
+    document.querySelectorAll('.qa-quick-chip').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        askGeminiQuestion(btn.getAttribute('data-q'));
+      });
+    });
+
+    elStandardQaForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (elStandardQaInput.value.trim()) {
+        askGeminiQuestion(elStandardQaInput.value);
+        elStandardQaInput.value = '';
+      }
+    });
+
+    elCompactQaForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (elCompactQaInput.value.trim()) {
+        askGeminiQuestion(elCompactQaInput.value);
+        elCompactQaInput.value = '';
+      }
+    });
+
+    if (elBtnBrandSettings) {
+      elBtnBrandSettings.addEventListener('click', () => {
+        elInputApiKey.value = state.apiKey;
+        elApiModal.classList.remove('hidden');
+      });
+    }
+    elBtnCloseApiModal.addEventListener('click', () => elApiModal.classList.add('hidden'));
+    elBtnSaveApiKey.addEventListener('click', () => {
+      state.apiKey = elInputApiKey.value.trim();
+      localStorage.setItem('gemini_api_key', state.apiKey);
+      elApiModal.classList.add('hidden');
+      updateApiKeyStatus();
+      if (state.isSessionActive && state.currentTrack.title) {
+        triggerGeminiAnalysis(state.trackGenerationId);
+      }
+    });
+
+    function updateApiKeyStatus() {
+      if (state.apiKey) elApiKeyDot.classList.add('hidden');
+      else elApiKeyDot.classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
