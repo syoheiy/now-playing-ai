@@ -1,4 +1,30 @@
-<!DOCTYPE html>
+import asyncio
+import json
+import os
+import sys
+import gc
+import urllib.request
+import urllib.parse
+import webbrowser
+from collections import OrderedDict
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from socketserver import ThreadingMixIn
+import threading
+
+try:
+    from winsdk.windows.media.control import (
+        GlobalSystemMediaTransportControlsSessionManager as MediaManager,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus
+    )
+except ImportError:
+    print("【エラー】winsdk がインストールされていません。")
+    print("pip install winsdk を実行してください。")
+    sys.exit(1)
+
+PORT = 8799
+
+# 内蔵する index.html の完全なソースコード
+HTML_PAYLOAD = """<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -23,7 +49,6 @@
       -moz-osx-font-smoothing: grayscale;
     }
 
-    /* 枠や囲みを完全に排除し、画面幅に合わせて自然にリフローするエディトリアルタイポグラフィ */
     .prose-music h3 {
       border-left: 4px solid #0284c7;
       padding-left: 0.65rem;
@@ -43,7 +68,6 @@
       border-left-color: #38bdf8;
     }
 
-    /* サブセクション（1. 2. 3. などの小見出し）：前には空行、本文との間には空行を挟まない */
     .prose-music h4, .prose-music .sub-heading {
       font-weight: 700;
       font-size: 1.05rem;
@@ -57,7 +81,6 @@
       color: #f1f5f9;
     }
 
-    /* 本文：見出し直下から空行なしで開始し、頭に全角1文字分の空白（インデント）を配置 */
     .prose-music p {
       color: #1e293b;
       font-size: 1.05rem;
@@ -80,7 +103,6 @@
       color: inherit;
     }
 
-    /* 番号付きリストやサブセクション項目の余白確保 */
     .prose-music ol {
       margin-top: 1rem;
       margin-bottom: 1.5rem;
@@ -99,54 +121,47 @@
 </head>
 <body class="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col selection:bg-sky-500/20">
 
-  <!-- ヘッダー：幅制限を撤廃し、画面幅100%に自然に展開 -->
   <header class="w-full px-3 sm:px-6 py-2.5 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 sticky top-0 z-40 backdrop-blur">
     <div id="btn-brand-settings" class="flex items-center gap-2 cursor-pointer select-none group shrink-0" title="Gemini API設定">
       <div class="h-6 w-6 rounded bg-sky-600 flex items-center justify-center text-white group-hover:bg-sky-500 transition">
         <i data-lucide="music-2" class="h-3.5 w-3.5"></i>
       </div>
-      <span class="font-bold text-xs tracking-tight">Now Playing</span>
+      <span class="font-bold text-xs tracking-tight hidden sm:inline">Now Playing</span>
       <span id="api-key-indicator-dot" class="w-1.5 h-1.5 rounded-full bg-amber-500 hidden" title="APIキー未設定"></span>
     </div>
 
-    <div class="flex items-center gap-2 shrink-0">
-      <button id="btn-toggle-compact" class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition whitespace-nowrap" title="ミニマム表示に切り替え">
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <button id="btn-toggle-compact" class="flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition shrink-0" title="ミニマム表示に切り替え">
         <i id="icon-compact" data-lucide="minimize-2" class="h-3.5 w-3.5"></i>
-        <span id="text-compact">ミニマム</span>
+        <span id="text-compact" class="hidden md:inline">ミニマム</span>
       </button>
 
-      <button id="btn-copy-track-header" class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition whitespace-nowrap" title="曲情報を共有またはコピー">
+      <button id="btn-copy-track-header" class="flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition shrink-0" title="曲情報を共有またはコピー">
         <i data-lucide="share-2" class="h-3.5 w-3.5"></i>
-        <span id="btn-copy-track-text">曲情報</span>
+        <span id="btn-copy-track-text" class="hidden md:inline">曲情報</span>
       </button>
 
-      <button id="btn-copy-notes-header" class="hidden flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition whitespace-nowrap" title="解説文を共有またはコピー">
+      <button id="btn-copy-notes-header" class="hidden flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium transition shrink-0" title="解説文を共有またはコピー">
         <i data-lucide="copy" class="h-3.5 w-3.5"></i>
-        <span id="btn-copy-notes-text">解説を共有</span>
+        <span id="btn-copy-notes-text" class="hidden md:inline">解説を共有</span>
       </button>
 
-      <button id="btn-toggle-session" class="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+      <button id="btn-toggle-session" class="p-2 sm:px-3.5 sm:py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shrink-0" title="ライナーノーツ開始 / 停止">
         <i id="icon-session-btn" data-lucide="sparkles" class="h-3.5 w-3.5"></i>
-        <span id="text-session-btn">ライナーノーツ開始</span>
+        <span id="text-session-btn" class="hidden sm:inline">ライナーノーツ開始</span>
       </button>
     </div>
   </header>
 
-  <!-- 受信ステータスバナー -->
   <div id="share-debug-banner" class="hidden w-full bg-sky-50 dark:bg-sky-950/60 px-4 py-2 text-xs text-sky-700 dark:text-sky-300 flex items-center justify-between">
     <span id="share-debug-text" class="truncate">共有データを受信しました</span>
     <button onclick="this.parentElement.classList.add('hidden')" class="ml-2 text-sky-500 hover:text-sky-700">✕</button>
   </div>
 
-  <!-- メイン領域：カードやボックスの囲みを一切廃止し、ウィンドウ全幅100%を活用 -->
   <main class="w-full flex-1 px-3 sm:px-8 py-4 flex flex-col gap-5">
-
-    <!-- 楽曲メタ情報：通常時は堂々としたアートワーク、ミニマム時はスリムな曲情報バー -->
     <section id="track-meta-section" class="w-full pb-4 border-b border-slate-100 dark:border-slate-800/80 transition-all duration-200">
       
-      <!-- 1. 通常表示（スタンダードモード）：堂々とした大型アートワーク -->
       <div id="meta-view-standard" class="w-full flex flex-col md:flex-row items-center md:items-start gap-5 md:gap-8">
-        <!-- アートワーク：見応えのあるサイズ（スマホでw-48〜56、PCでw-64〜72） -->
         <div class="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 shrink-0 flex items-center justify-center overflow-hidden rounded-lg shadow-sm">
           <img id="artwork-img" src="" alt="Album Artwork" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden">
           <div id="artwork-fallback" class="w-full h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 rounded-lg">
@@ -155,7 +170,6 @@
           </div>
         </div>
 
-        <!-- タイトル・アーティスト・ステータス -->
         <div class="flex-1 min-w-0 w-full flex flex-col justify-center text-center md:text-left">
           <div class="flex items-center justify-center md:justify-start gap-2 mb-1.5 flex-wrap">
             <span id="source-app-name" class="text-xs font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
@@ -176,32 +190,28 @@
           </p>
           <p id="track-album" class="text-sm text-slate-400 dark:text-slate-500 mt-1 break-words hidden"></p>
 
-          <!-- プレイヤーコントロール -->
           <div class="mt-4 flex items-center justify-center md:justify-start gap-4 flex-wrap">
             <div class="flex items-center gap-2">
-              <button id="btn-prev-track" class="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition"><i data-lucide="skip-back" class="h-4 w-4"></i></button>
-              <button id="btn-play-pause" class="w-9 h-9 rounded-full bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center transition shadow-sm">
-                <i id="icon-play-pause" data-lucide="play" class="h-4 w-4 fill-current ml-0.5"></i>
+              <button id="btn-prev-track" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition" title="前の曲"><i data-lucide="skip-back" class="h-4 w-4"></i></button>
+              <button id="btn-play-pause" class="w-10 h-10 rounded-full bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center transition shadow-sm" title="再生 / 一時停止">
+                <i id="icon-play-pause" data-lucide="play" class="h-5 w-5 fill-current ml-0.5"></i>
               </button>
-              <button id="btn-next-track" class="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition"><i data-lucide="skip-forward" class="h-4 w-4"></i></button>
+              <button id="btn-next-track" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition" title="次の曲"><i data-lucide="skip-forward" class="h-4 w-4"></i></button>
             </div>
             <div class="flex items-center gap-2 w-32">
-              <i data-lucide="volume-2" class="h-3 w-3 text-slate-400"></i>
-              <input type="range" id="volume-slider" min="0" max="100" value="50" class="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded appearance-none accent-sky-600">
+              <i data-lucide="volume-2" class="h-4 w-4 text-slate-400"></i>
+              <input type="range" id="volume-slider" min="0" max="100" value="50" class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none accent-sky-600 cursor-pointer">
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 2. ミニマム表示（曲情報を失わず、高さわずか約40pxに圧縮するスリムバー） -->
       <div id="meta-view-compact" class="hidden w-full flex items-center justify-between gap-3 py-1">
         <div class="flex items-center gap-3 min-w-0 flex-1">
-          <!-- ミニサムネイル -->
           <div class="w-10 h-10 shrink-0 rounded overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200/60 dark:border-slate-700/60">
             <img id="artwork-img-compact" src="" alt="Album Artwork" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden">
             <i id="artwork-fallback-compact" data-lucide="disc-3" class="h-5 w-5 text-slate-400"></i>
           </div>
-          <!-- 曲名 & アーティスト名（常に確認可能） -->
           <div class="min-w-0 flex-1">
             <h2 id="track-title-compact" class="text-sm font-bold text-slate-900 dark:text-white truncate">
               再生・共有を待機中
@@ -212,38 +222,30 @@
           </div>
         </div>
 
-        <!-- ミニマム時の一時停止/再生ボタン -->
         <div class="flex items-center gap-2 shrink-0">
           <button id="btn-play-pause-compact" class="w-8 h-8 rounded-full bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center transition shadow-sm" title="再生/一時停止">
             <i id="icon-play-pause-compact" data-lucide="play" class="h-3.5 w-3.5 fill-current ml-0.5"></i>
           </button>
         </div>
       </div>
-
     </section>
 
-    <!-- ライナーノーツ本文：枠や箱を完全に排し、画面全幅で自由にリフローする空間 -->
     <article class="w-full flex-1">
-      
-      <!-- ローディング表示 -->
       <div id="ai-loading" class="py-16 flex flex-col items-center justify-center gap-3 hidden">
         <div class="w-6 h-6 rounded-full border-2 border-slate-200 border-t-sky-600 animate-spin"></div>
         <p id="loading-text" class="text-xs text-slate-400 tracking-wider">ライナーノーツを生成中...</p>
       </div>
 
-      <!-- プレースホルダー（未開始時） -->
       <div id="ai-placeholder" class="py-16 text-center text-slate-400 dark:text-slate-500 text-sm">
         Apple Music等から曲を共有するか、「ライナーノーツ開始」を押すと本格的な解説が始まります。
       </div>
 
-      <!-- 本文出力先：一切の境界線・囲み枠なし -->
       <div id="ai-content-body" class="w-full hidden space-y-6">
         <div id="markdown-output" class="prose-music w-full"></div>
         <div id="qa-history" class="w-full space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800/80 hidden"></div>
       </div>
     </article>
 
-    <!-- 質問操作部：画面下部に自然に配置（箱で囲わない） -->
     <footer class="w-full pt-4 pb-6">
       <div class="flex flex-wrap gap-1.5 mb-2.5">
         <button class="qa-quick-chip px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs text-slate-600 dark:text-slate-300 transition whitespace-nowrap" data-q="アーティストの経歴や音楽的ルーツ、バイオグラフィを教えて">👤 プロフィール</button>
@@ -259,7 +261,6 @@
     </footer>
   </main>
 
-  <!-- 設定モーダル -->
   <div id="api-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl max-w-sm w-full p-6 shadow-xl">
       <div class="flex items-center justify-between mb-3">
@@ -274,8 +275,13 @@
   </div>
 
   <script>
-    // ユーザー指定の最新 gemini-3.8-flash を最優先に設定
-    const PRIMARY_MODELS = [
+    const CLASSICAL_MODELS = [
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-flash',
+      'gemini-2.5-flash'
+    ];
+
+    const GENERAL_MODELS = [
       'gemini-3.8-flash',
       'gemini-3.5-flash-lite',
       'gemini-2.5-flash'
@@ -304,7 +310,6 @@
       workingModel: null
     };
 
-    // DOM 要素参照
     const elMetaStandard = document.getElementById('meta-view-standard');
     const elMetaCompact = document.getElementById('meta-view-compact');
     const elBtnToggleCompact = document.getElementById('btn-toggle-compact');
@@ -361,21 +366,39 @@
     const elInputApiKey = document.getElementById('input-api-key');
     const elApiKeyDot = document.getElementById('api-key-indicator-dot');
 
-    function safeCreateIcons() { try { lucide.createIcons(); } catch(e) {} }
+    function safeCreateIcons() {
+      try {
+        if (window.lucide && typeof lucide.createIcons === 'function') {
+          lucide.createIcons();
+        }
+      } catch (e) {
+        console.warn('Lucide icon rendering:', e);
+      }
+    }
+
+    async function sendMediaControl(action) {
+      try {
+        await fetch('/api/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action })
+        });
+      } catch (e) {
+        console.warn('Media control API not reachable:', e);
+      }
+    }
+
+    if (elBtnPlayPause) elBtnPlayPause.addEventListener('click', () => sendMediaControl('play_pause'));
+    if (elBtnPlayPauseCompact) elBtnPlayPauseCompact.addEventListener('click', () => sendMediaControl('play_pause'));
+    if (elBtnPrev) elBtnPrev.addEventListener('click', () => sendMediaControl('previous'));
+    if (elBtnNext) elBtnNext.addEventListener('click', () => sendMediaControl('next'));
 
     function renderCleanMarkdown(rawMarkdown) {
       if (!rawMarkdown) return '';
       let text = rawMarkdown;
-
-      // 段落先頭にすでに全角・半角スペースが入っている場合に二重字下げになるのを防ぐため、行頭空白を除去してCSS側（text-indent: 1em）に全角1文字幅を完全統一
       text = text.replace(/^[　 \t]+/gm, '');
-
-      // 「1. 見出し」「2. 見出し」等のサブセクション行を自動検出し、太字小見出し(h4)化（見出し直後の空行は排除）
       text = text.replace(/(?:^|\n)(\d+\.\s+[^\n:：]+)(?:\n+)/g, '\n\n#### $1\n');
-
-      // 太字タグの正規化
       text = text.replace(/\*\*\s*([^\*\n]+?)\s*\*\*/g, '<strong>$1</strong>');
-
       let html = marked.parse(text);
       return html.replace(/\*\*/g, '');
     }
@@ -389,7 +412,6 @@
       return text;
     }
 
-    // ミニマム／標準表示の切り替え（曲情報を保持したまま、高さを極限まで圧縮）
     function toggleCompactMode() {
       state.isCompact = !state.isCompact;
       if (state.isCompact) {
@@ -406,26 +428,39 @@
       safeCreateIcons();
     }
 
-    if (elBtnToggleCompact) {
-      elBtnToggleCompact.addEventListener('click', toggleCompactMode);
-    }
+    if (elBtnToggleCompact) elBtnToggleCompact.addEventListener('click', toggleCompactMode);
 
     function updateSessionUI() {
       if (state.isSessionActive) {
-        // 動作中はグレーアウト調の落ち着いたスタイルに切り替え（停止可能を示す）
-        elBtnToggleSession.className = 'px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 text-xs font-medium transition flex items-center gap-1.5 whitespace-nowrap';
+        elBtnToggleSession.className = 'p-2 sm:px-3.5 sm:py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 text-xs font-medium transition flex items-center gap-1.5 shrink-0';
         elIconSessionBtn.setAttribute('data-lucide', 'square');
         elIconSessionBtn.classList.add('fill-current');
         elTextSessionBtn.textContent = 'ライナーノーツ停止';
+        elBtnToggleSession.setAttribute('title', 'ライナーノーツ停止');
         elSessionBadge.classList.remove('hidden');
       } else {
-        // 停止中は鮮やかな青色のプライマリボタンスタイル
-        elBtnToggleSession.className = 'px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition flex items-center gap-1.5 whitespace-nowrap';
+        elBtnToggleSession.className = 'p-2 sm:px-3.5 sm:py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shrink-0';
         elIconSessionBtn.setAttribute('data-lucide', 'sparkles');
         elIconSessionBtn.classList.remove('fill-current');
         elTextSessionBtn.textContent = 'ライナーノーツ開始';
+        elBtnToggleSession.setAttribute('title', 'ライナーノーツ開始');
         elSessionBadge.classList.add('hidden');
         elAnalysisStatusText.textContent = '停止中';
+      }
+      safeCreateIcons();
+    }
+
+    function updatePlayPauseIcons(isPlaying) {
+      const iconName = isPlaying ? 'pause' : 'play';
+      if (elIconPlayPause) {
+        elIconPlayPause.setAttribute('data-lucide', iconName);
+        if (isPlaying) elIconPlayPause.classList.remove('ml-0.5');
+        else elIconPlayPause.classList.add('ml-0.5');
+      }
+      if (elIconPlayPauseCompact) {
+        elIconPlayPauseCompact.setAttribute('data-lucide', iconName);
+        if (isPlaying) elIconPlayPauseCompact.classList.remove('ml-0.5');
+        else elIconPlayPauseCompact.classList.add('ml-0.5');
       }
       safeCreateIcons();
     }
@@ -499,7 +534,7 @@
       const artist = state.currentTrack.parsedArtist || state.currentTrack.artist;
       const album = state.currentTrack.parsedAlbum || state.currentTrack.album;
 
-      const metaHeader = `## ${title} / ${artist}${album ? ` (アルバム: ${album})` : ''}\n\n`;
+      const metaHeader = `## ${title} / ${artist}${album ? ` (アルバム: ${album})` : ''}\\n\\n`;
       const formattedBody = formatMarkdownForClipboard(state.latestInsightText);
       const fullText = metaHeader + formattedBody;
 
@@ -516,6 +551,8 @@
       updateSessionUI();
       if (state.currentTrack.title) {
         triggerGeminiAnalysis(state.trackGenerationId);
+      } else {
+        elAiPlaceholder.innerHTML = '<div class="py-4 text-sky-600 dark:text-sky-400 text-xs">現在、曲の再生・共有を待機しています。<br>音楽アプリで曲を再生すると自動的にライナーノーツの執筆が始まります。</div>';
       }
     }
 
@@ -527,6 +564,7 @@
       elAiContentBody.classList.add('hidden');
       elBtnCopyNotesHeader.classList.add('hidden');
       elAiPlaceholder.classList.remove('hidden');
+      elAiPlaceholder.innerHTML = 'Apple Music等から曲を共有するか、「ライナーノーツ開始」を押すと本格的な解説が始まります。';
       state.chatHistory = [];
       renderQaHistory();
       updateSessionUI();
@@ -534,149 +572,11 @@
     }
 
     elBtnToggleSession.addEventListener('click', () => {
-      if (state.isSessionActive) {
-        stopSession();
-      } else {
-        startSession();
-      }
+      if (state.isSessionActive) stopSession();
+      else startSession();
     });
 
-    function jsonpFetch(url) {
-      return new Promise((resolve, reject) => {
-        const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
-        const script = document.createElement('script');
-        const sep = url.includes('?') ? '&' : '?';
-        script.src = `${url}${sep}callback=${callbackName}`;
-        
-        const cleanup = () => {
-          if (script.parentNode) script.parentNode.removeChild(script);
-          delete window[callbackName];
-        };
-
-        window[callbackName] = (data) => {
-          cleanup();
-          resolve(data);
-        };
-        script.onerror = () => {
-          cleanup();
-          reject(new Error('JSONP request failed'));
-        };
-        document.body.appendChild(script);
-      });
-    }
-
-    async function parseAppleMusicOrText(rawText, rawTitle, rawUrl) {
-      const fullText = `${rawTitle || ''} ${rawText || ''}`.trim();
-      const extractedUrl = (rawUrl || fullText.match(/https?:\/\/[^\s]+/i)?.[0] || '').trim();
-
-      let textOnly = fullText.replace(/https?:\/\/[^\s]+/gi, '').trim();
-      let title = '';
-      let artist = '';
-      let album = '';
-      let artworkUrl = '';
-
-      const quoteMatch = textOnly.match(/[「"『](.+?)[」"』]/);
-      if (quoteMatch) {
-        title = quoteMatch[1].trim();
-        let rest = textOnly.replace(quoteMatch[0], '').trim();
-        rest = rest.replace(/^(by|の)\s*/i, '').replace(/\s*(by|の)$/i, '').trim();
-        artist = rest;
-      } else if (/\bby\b/i.test(textOnly)) {
-        const parts = textOnly.split(/\bby\b/i);
-        title = parts[0].trim();
-        artist = parts.slice(1).join(' by ').trim();
-      } else if (textOnly.includes(' - ')) {
-        const parts = textOnly.split(' - ');
-        title = parts[0].trim();
-        artist = parts.slice(1).join(' - ').trim();
-      } else if (textOnly.includes(' / ')) {
-        const parts = textOnly.split(' / ');
-        title = parts[0].trim();
-        artist = parts.slice(1).join(' / ').trim();
-      } else {
-        title = textOnly;
-      }
-
-      if (extractedUrl && (extractedUrl.includes('music.apple.com') || extractedUrl.includes('itunes.apple.com'))) {
-        try {
-          const trackIdMatch = extractedUrl.match(/[?&]i=(\d+)/) || extractedUrl.match(/\/song\/(?:[^/]+\/)?(\d+)/) || extractedUrl.match(/\/album\/(?:[^/]+\/)?(\d+)/);
-          const lookupId = trackIdMatch ? trackIdMatch[1] : '';
-
-          if (lookupId) {
-            const itunesData = await jsonpFetch(`https://itunes.apple.com/lookup?id=${lookupId}&country=JP`);
-            if (itunesData && itunesData.resultCount > 0) {
-              const item = itunesData.results[0];
-              title = item.trackName || item.collectionName || title;
-              artist = item.artistName || artist;
-              album = item.collectionName || album;
-              if (item.artworkUrl100) {
-                artworkUrl = item.artworkUrl100.replace('100x100bb', '600x600bb');
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('iTunes Lookup failed:', e);
-        }
-
-        if (!title || !artist) {
-          const slugMatch = extractedUrl.match(/\/album\/([^/]+)\/|\/song\/([^/]+)\//);
-          if (slugMatch) {
-            const rawSlug = decodeURIComponent(slugMatch[1] || slugMatch[2] || '');
-            const readable = rawSlug.replace(/[-_]/g, ' ').trim();
-            if (!title) title = readable;
-          }
-        }
-      }
-
-      title = (title || '').replace(/^["'『「]+|["'』」]+$/g, '').trim();
-      artist = (artist || '').replace(/^["'『「]+|["'』」]+$/g, '').trim();
-
-      if (!title && extractedUrl) {
-        title = extractedUrl;
-      }
-
-      return { title, artist, album, artworkUrl, raw: fullText, url: extractedUrl };
-    }
-
-    async function checkIncomingShare() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sharedTitle = urlParams.get('title') || '';
-      const sharedText = urlParams.get('text') || '';
-      const sharedUrl = urlParams.get('url') || '';
-
-      if (sharedTitle || sharedText || sharedUrl) {
-        elShareDebugBanner.classList.remove('hidden');
-        elShareDebugText.textContent = `共有データ受信中...`;
-
-        const parsed = await parseAppleMusicOrText(sharedText, sharedTitle, sharedUrl);
-        
-        if (parsed.title) {
-          const displayLabel = parsed.artist ? `${parsed.title} / ${parsed.artist}` : parsed.title;
-          elShareDebugText.textContent = `認識完了: ${displayLabel}`;
-          setTimeout(() => elShareDebugBanner.classList.add('hidden'), 5000);
-
-          handleIncomingTrack({
-            title: parsed.title,
-            artist: parsed.artist || 'Apple Music',
-            album: parsed.album || '',
-            artwork_url: parsed.artworkUrl,
-            playing: true,
-            has_artwork: !!parsed.artworkUrl,
-            artwork_seq: 0,
-            app: 'Apple Music'
-          });
-
-          startSession();
-        } else {
-          elShareDebugText.textContent = `解析できませんでした: ${parsed.raw}`;
-        }
-      }
-    }
-
     async function pollSmtcBridge() {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('title') || urlParams.get('text') || urlParams.get('url')) return;
-
       try {
         const res = await fetch('/api/track');
         if (res.ok) {
@@ -693,6 +593,9 @@
       const trackTitle = (data.title || '').trim();
       const rawArtist = (data.artist || '').trim();
       const rawAlbum = (data.album || '').trim();
+      const isPlaying = !!data.playing;
+
+      updatePlayPauseIcons(isPlaying);
       if (!trackTitle) return;
 
       const trackKey = `${trackTitle}:::${rawArtist}`;
@@ -707,7 +610,8 @@
         state.currentTrack.parsedArtist = rawArtist;
         state.currentTrack.parsedAlbum = rawAlbum;
 
-        // 通常表示の更新
+        renderArtwork('');
+
         elTrackTitle.textContent = trackTitle;
         elTrackArtist.textContent = rawArtist;
         if (rawAlbum) {
@@ -717,7 +621,6 @@
           elTrackAlbum.classList.add('hidden');
         }
 
-        // ミニマム表示（スリムバー）の更新：曲情報を常に同期
         elTrackTitleCompact.textContent = trackTitle;
         elTrackArtistCompact.textContent = rawArtist + (rawAlbum ? ` - 『${rawAlbum}』` : '');
 
@@ -742,15 +645,67 @@
       }
     }
 
-    function getCandidateModels() {
-      if (state.workingModel) {
-        return [state.workingModel, ...PRIMARY_MODELS.filter(m => m !== state.workingModel)];
-      }
-      return [...PRIMARY_MODELS];
+    const FAMOUS_COMPOSERS = [
+      'bach', 'mozart', 'beethoven', 'brahms', 'chopin', 'tchaikovsky', 'mahler', 'bruckner',
+      'schubert', 'schumann', 'liszt', 'debussy', 'ravel', 'rachmaninoff', 'rachmaninov',
+      'shostakovich', 'stravinsky', 'dvořák', 'dvorak', 'sibelius', 'vivaldi', 'handel', 'haendel',
+      'haydn', 'mendelssohn', 'wagner', 'verdi', 'puccini', 'rossini', 'berlioz', 'strauss',
+      'saint-saëns', 'saint-saens', 'grieg', 'faure', 'fauré', 'satie', 'bartok', 'bartók',
+      'prokofiev', 'holst', 'elgar', 'respighi', 'copland', 'barber', 'paganini',
+      'telemann', 'purcell', 'monteverdi', 'scarlatti', 'albinoni', 'corelli',
+      'バッハ', 'モーツァルト', 'ベートーヴェン', 'ベートーベン', 'ブラームス', 'ショパン',
+      'チャイコフスキー', 'マーラー', 'ブルックナー', 'シューベルト', 'シューマン', 'リスト',
+      'ドビュッシー', 'ラヴェル', 'ラフマニノフ', 'ショスタコーヴィチ', 'ストラヴィンスキー',
+      'ドヴォルザーク', 'シベリウス', 'ヴィヴァルディ', 'ヘンデル', 'ハイドン', 'メンデルスゾーン',
+      'ワーグナー', 'ヴェルディ', 'プッチーニ', 'ロッシーニ', 'ベルリオーズ', 'シュトラウス',
+      'サン＝サーンス', 'サンサーンス', 'グリーグ', 'フォーレ', 'サティ', 'バルトーク',
+      'プロコフィエフ', 'ホルスト', 'エルガー', 'レスピーギ', 'パガニーニ', 'テレマン',
+      'スカルラッティ', 'アルビノーニ'
+    ];
+
+    const MODERN_NEO_CLASSICAL_ARTISTS = [
+      '坂本龍一', 'ryuichi sakamoto', '久石譲', 'joe hisaishi', 'max richter', 'マックス・リヒター',
+      'ludovico einaudi', 'ルドヴィコ・エイナウディ', 'ólafur arnalds', 'olafur arnalds', 'オラフル・アルナルズ',
+      'nils frahm', 'ニルス・フラーム', 'johann johannsson', 'ヨハン・ヨハンソン', 'john williams', 'ジョン・ウィリアムズ',
+      'hans zimmer', 'ハンス・ジマー', 'ennio morricone', 'エンニオ・モリコーネ', 'philip glass', 'フィリップ・グラス',
+      'steve reich', 'スティーヴ・ライヒ', 'arvo pärt', 'arvo part', 'アルヴォ・ペルト', 'yiruma', 'イルマ',
+      'haruka nakamura', 'world\\'s end girlfriend', 'serafim tsotsonis', 'dustin o\\'halloran', 'chilly gonzales'
+    ];
+
+    function isClassicalTrack(title, artist, album, composer = '') {
+      const cleanTitle = (title || '').trim().toLowerCase();
+      const cleanArtist = (artist || '').trim().toLowerCase();
+      const cleanAlbum = (album || '').trim().toLowerCase();
+      const cleanComposer = (composer || '').trim().toLowerCase();
+      const fullText = `${cleanTitle} ${cleanArtist} ${cleanAlbum} ${cleanComposer}`;
+
+      if (MODERN_NEO_CLASSICAL_ARTISTS.some(name => fullText.includes(name))) return false;
+      if (cleanComposer.length > 0 && FAMOUS_COMPOSERS.some(c => cleanComposer.includes(c))) return true;
+
+      const composerTagPattern = /(composer|作曲者?|composed by)\\s*[:：]/i;
+      if (composerTagPattern.test(fullText) && FAMOUS_COMPOSERS.some(c => fullText.includes(c))) return true;
+      if (FAMOUS_COMPOSERS.some(c => cleanArtist.includes(c))) return true;
+
+      const composerPrefixPattern = new RegExp(`^(${FAMOUS_COMPOSERS.join('|')})\\\\s*[:：\\\\-]`, 'i');
+      if (composerPrefixPattern.test(cleanTitle)) return true;
+
+      const catalogPattern = /\\b(op\\.|opus|bwv|kv|k\\.|hob\\.|d\\.|sz\\.|rv|woo|anh\\.|s\\.)\\s*\\d+/i;
+      const movementPattern = /\\b(movement|movt|mvt)\\b|第[一二三四五六七八九\\d]+楽章/i;
+      if (catalogPattern.test(fullText) || movementPattern.test(fullText)) return true;
+
+      return false;
     }
 
-    async function callGeminiWithFallback(apiKey, bodyObj) {
-      const candidateModels = getCandidateModels();
+    function getCandidateModels(isClassical) {
+      const baseModels = isClassical ? CLASSICAL_MODELS : GENERAL_MODELS;
+      if (state.workingModel && baseModels.includes(state.workingModel)) {
+        return [state.workingModel, ...baseModels.filter(m => m !== state.workingModel)];
+      }
+      return [...baseModels];
+    }
+
+    async function callGeminiWithFallback(apiKey, bodyObj, isClassical = false) {
+      const candidateModels = getCandidateModels(isClassical);
       let lastError = null;
 
       for (const model of candidateModels) {
@@ -766,7 +721,7 @@
             const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (resultText) {
               state.workingModel = model;
-              return resultText;
+              return { text: resultText, usedModel: model };
             }
           }
 
@@ -777,19 +732,14 @@
           if (res.status === 401 || errMsg.includes('API_KEY_INVALID') || errMsg.includes('key not valid')) {
             throw lastError;
           }
-
-          console.warn(`Model ${model} failed (${errMsg}). Trying next model...`);
-          continue;
-
+          console.warn(`Model ${model} failed (${errMsg}). Trying next...`);
         } catch (e) {
           lastError = e;
           if (e.message && (e.message.includes('API_KEY_INVALID') || e.message.includes('key not valid'))) {
             throw e;
           }
-          continue;
         }
       }
-
       throw lastError || new Error('利用可能なGeminiモデルが見つかりませんでした。');
     }
 
@@ -799,8 +749,7 @@
       if (!apiKey) {
         elAiPlaceholder.classList.add('hidden');
         elAiContentBody.classList.remove('hidden');
-        const errHtml = '<div class="py-3 text-amber-600 text-xs">左上のアイコンから Gemini API キーを設定してください。</div>';
-        elMarkdownOutput.innerHTML = errHtml;
+        elMarkdownOutput.innerHTML = '<div class="py-3 text-amber-600 text-xs">左上のアイコンから Gemini API キーを設定してください。</div>';
         return;
       }
 
@@ -810,21 +759,29 @@
       elAiLoading.classList.remove('hidden');
       elBtnCopyNotesHeader.classList.add('hidden');
 
-      elAnalysisStatusText.textContent = '解析中...';
-      elLoadingText.textContent = 'ライナーノーツを生成中...';
+      const artist = state.currentTrack.parsedArtist || state.currentTrack.artist;
+      const album = state.currentTrack.parsedAlbum || state.currentTrack.album;
+      const title = state.currentTrack.title;
+      const isClassical = isClassicalTrack(title, artist, album);
 
-      const artist = state.currentTrack.parsedArtist;
-      const album = state.currentTrack.parsedAlbum;
-      const prompt = `現在再生中の以下の楽曲について、本格的な音楽ライナーノーツを作成してください。
-曲名: ${state.currentTrack.title}
-アーティスト: ${artist}
-アルバム: ${album || 'シングル / 不明'}
+      elAnalysisStatusText.textContent = isClassical ? '解析中 (Classic/高速モード)' : '解析中 (標準/ディープモード)';
+      elLoadingText.textContent = isClassical ? 'クラシック楽曲を高速分析中...' : 'ライナーノーツをじっくり執筆中...';
+
+      let prompt = '';
+      let maxTokens = 2048;
+
+      if (isClassical) {
+        maxTokens = 2048;
+        prompt = `現在再生中の以下のクラシック楽曲について、演奏時間内に読み終えられるスマートなライナーノーツを作成してください。
+曲名: ${title}
+演奏者・指揮者・作曲者: ${artist}
+アルバム: ${album || '不明'}
 
 絶対厳守の執筆ルール:
 1. 【前置き・挨拶の完全禁止】
    前置き文は1文字も書かず、1行目からいきなり「### アーティストと楽曲の背景」で開始してください。
 2. 【見出しと構成】
-   必ず以下の3つの見出しを使用し、各パートをしっかり詳しく記述してください。
+   以下の3つの見出しのみを使用し、要点を簡潔かつ密度高くまとめてください。
    ・見出しの前には空行を1行入れてください。
    ・見出しの直後の行から空行を挟まずに本文を開始してください。
 
@@ -837,45 +794,67 @@
    ### 聴きどころと位置づけ
    本文...
 
-3. 【事実の正確性とクレジットの徹底】
-   - 作詞・作曲・編曲者、リリース年、参加ミュージシャンなどの固有名詞を正確に記述してください。
-   - アーティストの出自・音楽的ルーツや特徴を詳しく紹介してください。
+3. 【事実の正確性とクレジット】
+   - 作曲者、作品番号（Op./BWV/KV等）、調性、指揮者、オーケストラ/ソリストを正確に記述してください。
 4. 【太字強調のルール】
-   - アーティスト名、重要人名、年代表記、コード進行、キーとなる音楽用語は太字（**単語**）で強調してください。`;
+   - 作曲者名、演奏者名、楽章名、重要な音楽用語は太字（**単語**）で強調してください。`;
+      } else {
+        maxTokens = 4096;
+        prompt = `現在再生中の以下の楽曲について、音楽雑誌のエッセイや専門誌の特集記事のような深みと熱量のある本格的なライナーノーツを作成してください。
+曲名: ${title}
+アーティスト: ${artist}
+アルバム: ${album || 'シングル / 不明'}
+
+ジャンル・文脈への配慮:
+- ポップス、ロック、ジャズはもちろんのこと、オーケストラやピアノ編成であっても、現代アーティストの自作曲（ポスト・クラシカル、映画音楽、コンテンポラリー・インストゥルメンタル等）である場合は、単なる形式的な楽章解説ではなく、アーティストの音楽思想、世界観、音響・録音への美学、時代・カルチャーとの結びつきを深く掘り下げてください。
+
+絶対厳守の執筆ルール:
+1. 【前置き・挨拶の完全禁止】
+   前置き文は1文字も書かず、1行目からいきなり「### アーティストと楽曲の背景」で開始してください。
+2. 【見出しと構成】
+   以下の3つの見出しを使用し、アーティストのルーツや当時の音楽シーンとの関係、録音秘話、サウンドの意図などをじっくり詳しく記述してください。
+   ・見出しの前には空行を1行入れてください。
+   ・見出しの直後の行から空行を挟まずに本文を開始してください。
+
+   ### アーティストと楽曲の背景
+   本文...
+
+   ### 演奏・アンサンブルの特徴
+   本文...
+
+   ### 聴きどころと位置づけ
+   本文...
+
+3. 【事実の正確性とクレジット】
+   - 作詞・作曲・編曲者、リリース年、参加ミュージシャン、使用楽器・機材、プロデューサーなどの固有名詞を正確に記述してください。
+4. 【太字強調のルール】
+   - アーティスト名、重要人名、年代表記、コード進行、重要キーワードは太字（**単語**）で強調してください。`;
+      }
 
       try {
         const bodyObj = {
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { 
-            maxOutputTokens: 4096
-          }
+          generationConfig: { maxOutputTokens: maxTokens }
         };
 
-        const text = await callGeminiWithFallback(apiKey, bodyObj);
-
+        const { text, usedModel } = await callGeminiWithFallback(apiKey, bodyObj, isClassical);
         if (targetGenId !== state.trackGenerationId) return;
 
         state.latestInsightText = text;
-
-        const cleanHtml = renderCleanMarkdown(text);
-        elMarkdownOutput.innerHTML = cleanHtml;
+        elMarkdownOutput.innerHTML = renderCleanMarkdown(text);
 
         elAiLoading.classList.add('hidden');
         elAiContentBody.classList.remove('hidden');
         elBtnCopyNotesHeader.classList.remove('hidden');
-        elAnalysisStatusText.textContent = '完了';
-
+        elAnalysisStatusText.textContent = `完了 (${usedModel.replace('gemini-', '')})`;
       } catch (err) {
         if (targetGenId !== state.trackGenerationId) return;
-        const errHtml = `<div class="py-3 text-rose-600 text-xs font-mono">生成エラー: ${err.message}</div>`;
-        elMarkdownOutput.innerHTML = errHtml;
+        elMarkdownOutput.innerHTML = `<div class="py-3 text-rose-600 text-xs font-mono">生成エラー: ${err.message}</div>`;
         elAiLoading.classList.add('hidden');
         elAiContentBody.classList.remove('hidden');
         elAnalysisStatusText.textContent = 'エラー';
       } finally {
-        if (targetGenId === state.trackGenerationId) {
-          state.isAnalyzing = false;
-        }
+        if (targetGenId === state.trackGenerationId) state.isAnalyzing = false;
       }
     }
 
@@ -908,10 +887,9 @@
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: 2048 }
         };
-
         const answer = await callGeminiWithFallback(state.apiKey, bodyObj);
         const idx = state.chatHistory.findIndex(i => i.id === loadingId);
-        if (idx !== -1) state.chatHistory[idx] = { role: 'model', text: answer, rawMarkdown: answer, questionContext: question };
+        if (idx !== -1) state.chatHistory[idx] = { role: 'model', text: answer.text || answer };
       } catch (err) {
         const idx = state.chatHistory.findIndex(i => i.id === loadingId);
         if (idx !== -1) state.chatHistory[idx] = { role: 'model', text: `エラー: ${err.message}` };
@@ -928,36 +906,24 @@
         return;
       }
       elQaHistory.classList.remove('hidden');
-      elQaHistory.innerHTML = state.chatHistory.map((item) => {
+      elQaHistory.innerHTML = state.chatHistory.map(item => {
         if (item.role === 'user') {
-          return `
-            <div class="flex justify-end">
-              <div class="bg-sky-600 text-white rounded-lg px-3.5 py-2 text-xs max-w-[85%]">
-                ${item.text}
-              </div>
-            </div>
-          `;
+          return `<div class="flex justify-end"><div class="bg-sky-600 text-white rounded-lg px-3.5 py-2 text-xs max-w-[85%]">${item.text}</div></div>`;
         } else {
-          return `
-            <div class="flex flex-col items-start gap-1 max-w-full">
-              <div class="w-full text-xs leading-relaxed prose-music">
-                ${item.isLoading ? '<span class="inline-flex items-center gap-1.5 text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>思考中...</span>' : renderCleanMarkdown(item.text)}
-              </div>
-            </div>
-          `;
+          return `<div class="flex flex-col items-start gap-1 max-w-full"><div class="w-full text-xs leading-relaxed prose-music">${item.isLoading ? '<span class="inline-flex items-center gap-1.5 text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>思考中...</span>' : renderCleanMarkdown(item.text)}</div></div>`;
         }
       }).join('');
       safeCreateIcons();
     }
 
     document.querySelectorAll('.qa-quick-chip').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', e => {
         e.preventDefault();
         askGeminiQuestion(btn.getAttribute('data-q'));
       });
     });
 
-    elQaForm.addEventListener('submit', (e) => {
+    elQaForm.addEventListener('submit', e => {
       e.preventDefault();
       if (elQaInput.value.trim()) {
         askGeminiQuestion(elQaInput.value);
@@ -978,9 +944,7 @@
       localStorage.setItem('gemini_api_key', state.apiKey);
       elApiModal.classList.add('hidden');
       updateApiKeyStatus();
-      if (state.currentTrack.title) {
-        startSession();
-      }
+      if (state.currentTrack.title) startSession();
     });
 
     function updateApiKeyStatus() {
@@ -989,19 +953,248 @@
     }
 
     updateApiKeyStatus();
-    checkIncomingShare();
-  </script>
-  <script>
-    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:') && !location.href.startsWith('blob:')) {
-      try {
-        const swPath = new URL('./sw.js', window.location.href).href;
-        navigator.serviceWorker.register(swPath).catch(err => {
-          console.warn('Service Worker registration skipped:', err);
-        });
-      } catch (e) {
-        console.warn('Service Worker setup skipped:', e);
-      }
-    }
+    safeCreateIcons();
   </script>
 </body>
 </html>
+"""
+
+current_track_info = {
+    "title": "",
+    "artist": "",
+    "album": "",
+    "app": "",
+    "playing": False,
+    "has_artwork": False,
+    "artwork_seq": 0,
+    "volume": 50
+}
+
+current_artwork_bytes = b""
+current_artwork_mime = "image/jpeg"
+seq_counter = 0
+
+MAX_CACHE_ITEMS = 20
+artwork_cache = OrderedDict()
+
+def update_artwork_from_itunes(title, artist):
+    global current_artwork_bytes, current_artwork_mime, seq_counter
+    clean_artist = artist.split('—')[0].split('-')[0].strip()
+    cache_key = f"{title}:::{clean_artist}".lower()
+
+    if cache_key in artwork_cache:
+        cached_bytes, cached_mime = artwork_cache[cache_key]
+        artwork_cache.move_to_end(cache_key)
+        seq_counter += 1
+        current_artwork_bytes = cached_bytes
+        current_artwork_mime = cached_mime
+        current_track_info["has_artwork"] = True
+        current_track_info["artwork_seq"] = seq_counter
+        return
+
+    try:
+        query = f"{clean_artist} {title}"
+        url = f"https://itunes.apple.com/search?term={urllib.parse.quote(query)}&entity=song&limit=1"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=3) as res:
+            if res.status == 200:
+                data = json.loads(res.read().decode('utf-8'))
+                if data.get('resultCount', 0) > 0:
+                    raw_art = data['results'][0].get('artworkUrl100', '')
+                    high_res_art = raw_art.replace('100x100bb', '600x600bb')
+                    
+                    img_req = urllib.request.Request(high_res_art, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(img_req, timeout=4) as img_res:
+                        img_bytes = img_res.read()
+                        mime = img_res.headers.get_content_type() or 'image/jpeg'
+                        seq_counter += 1
+                        current_artwork_bytes = img_bytes
+                        current_artwork_mime = mime
+                        current_track_info["has_artwork"] = True
+                        current_track_info["artwork_seq"] = seq_counter
+                        
+                        if len(artwork_cache) >= MAX_CACHE_ITEMS:
+                            artwork_cache.popitem(last=False)
+                        artwork_cache[cache_key] = (img_bytes, mime)
+                        return
+    except Exception as e:
+        print(f"画像取得スキップ: {e}")
+
+    current_artwork_bytes = b""
+    current_track_info["has_artwork"] = False
+    current_track_info["artwork_seq"] = 0
+
+def trigger_media_control_async(action):
+    def run_control():
+        asyncio.run(execute_media_control(action))
+    t = threading.Thread(target=run_control, daemon=True)
+    t.start()
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+class UnifiedBridgeHandler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def do_GET(self):
+        # ルートまたは /index.html へのアクセス時は内蔵 HTML を直接返却
+        if self.path in ('/', '/index.html', ''):
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(HTML_PAYLOAD.encode('utf-8'))
+            return
+
+        if self.path == '/api/track':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            data = json.dumps(current_track_info, ensure_ascii=False)
+            try:
+                self.wfile.write(data.encode('utf-8'))
+            except (ConnectionResetError, BrokenPipeError):
+                pass
+            return
+
+        if self.path.startswith('/api/artwork'):
+            global current_artwork_bytes, current_artwork_mime
+            if current_artwork_bytes:
+                self.send_response(200)
+                self.send_header('Content-Type', current_artwork_mime)
+                self.send_header('Content-Length', str(len(current_artwork_bytes)))
+                self.end_headers()
+                try:
+                    self.wfile.write(current_artwork_bytes)
+                except (ConnectionResetError, BrokenPipeError):
+                    pass
+            else:
+                self.send_response(404)
+                self.end_headers()
+            return
+
+        # その他の静的ファイルリクエスト（manifest.json, icon.svg等があれば通常配信）
+        return super().do_GET()
+
+    def do_POST(self):
+        if self.path == '/api/control':
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                req = json.loads(body)
+                action = req.get('action')
+                trigger_media_control_async(action)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(b'{"status":"ok"}')
+            except Exception:
+                self.send_response(500)
+                self.end_headers()
+            return
+        return super().do_POST()
+
+    def log_message(self, format, *args):
+        pass
+
+async def execute_media_control(action):
+    try:
+        manager = await MediaManager.request_async()
+        session = manager.get_current_session()
+        if not session:
+            return
+
+        if action == 'play_pause':
+            await session.try_toggle_play_pause_async()
+        elif action == 'next':
+            await session.try_skip_next_async()
+        elif action == 'previous':
+            await session.try_skip_previous_async()
+    except Exception:
+        pass
+
+async def monitor_smtc_loop():
+    global current_track_info
+    print("Windows SMTC 監視稼働中（省リソースモード）")
+    last_key = ""
+    gc_counter = 0
+
+    while True:
+        try:
+            manager = await MediaManager.request_async()
+            session = manager.get_current_session()
+
+            if session:
+                app_id = session.source_app_user_model_id or "Media App"
+                playback_info = session.get_playback_info()
+                is_playing = (playback_info.playback_status == PlaybackStatus.PLAYING) if playback_info else False
+
+                media_props = await session.try_get_media_properties_async()
+                if media_props:
+                    title = (media_props.title or "").strip()
+                    artist = (media_props.artist or "").strip()
+                    album = (media_props.album_title or "").strip()
+                    track_key = f"{title}:::{artist}"
+
+                    if track_key != last_key and title != "":
+                        last_key = track_key
+                        print(f"[再生] {title} / {artist}")
+
+                        current_track_info["title"] = title
+                        current_track_info["artist"] = artist
+                        current_track_info["album"] = album
+                        current_track_info["app"] = "Apple Music" if "AppleMusic" in app_id else app_id
+                        current_track_info["playing"] = is_playing
+
+                        update_artwork_from_itunes(title, artist)
+
+                    current_track_info["title"] = title
+                    current_track_info["artist"] = artist
+                    current_track_info["album"] = album
+                    current_track_info["app"] = "Apple Music" if "AppleMusic" in app_id else app_id
+                    current_track_info["playing"] = is_playing
+            else:
+                current_track_info["playing"] = False
+
+        except Exception:
+            pass
+
+        gc_counter += 1
+        if gc_counter >= 30:
+            gc_counter = 0
+            gc.collect()
+
+        await asyncio.sleep(0.7)
+
+def start_server():
+    server_address = ('', PORT)
+    httpd = ThreadedHTTPServer(server_address, UnifiedBridgeHandler)
+    url = f"http://localhost:{PORT}/"
+    print(f"HTTPサーバー稼働中: {url}")
+    # サーバー起動時に自動でブラウザを開く
+    threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        httpd.server_close()
+
+if __name__ == '__main__':
+    server_thread = threading.Thread(target=start_server, daemon=True)
+    server_thread.start()
+
+    try:
+        asyncio.run(monitor_smtc_loop())
+    except KeyboardInterrupt:
+        print("\n終了しました。")
+        sys.exit(0)
